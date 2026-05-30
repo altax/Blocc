@@ -25,7 +25,10 @@ import type {
   BotSettingsUpdate,
   BotStats,
   BotStatus,
+  BulkLearnRequest,
+  BulkLearnResponse,
   ChatPattern,
+  ClearPatterns200,
   GetLogsParams,
   GetMessagesParams,
   GetPatternsParams,
@@ -810,6 +813,147 @@ export const useLearnFromChannel = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getLearnFromChannelMutationOptions(options));
+    }
+
+export const getClearPatternsUrl = () => {
+
+
+
+
+  return `/api/patterns`
+}
+
+/**
+ * @summary Clear all learned patterns
+ */
+export const clearPatterns = async ( options?: RequestInit): Promise<ClearPatterns200> => {
+
+  return customFetch<ClearPatterns200>(getClearPatternsUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getClearPatternsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearPatterns>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearPatterns>>, TError,void, TContext> => {
+
+const mutationKey = ['clearPatterns'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearPatterns>>, void> = () => {
+
+
+          return  clearPatterns(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearPatternsMutationResult = NonNullable<Awaited<ReturnType<typeof clearPatterns>>>
+
+    export type ClearPatternsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Clear all learned patterns
+ */
+export const useClearPatterns = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearPatterns>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearPatterns>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClearPatternsMutationOptions(options));
+    }
+
+export const getBulkLearnFromStreamersUrl = () => {
+
+
+
+
+  return `/api/patterns/bulk-learn`
+}
+
+/**
+ * @summary Learn from multiple preset Russian CS2 streamers at once
+ */
+export const bulkLearnFromStreamers = async (bulkLearnRequest: BulkLearnRequest, options?: RequestInit): Promise<BulkLearnResponse> => {
+
+  return customFetch<BulkLearnResponse>(getBulkLearnFromStreamersUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bulkLearnRequest,)
+  }
+);}
+
+
+
+
+export const getBulkLearnFromStreamersMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkLearnFromStreamers>>, TError,{data: BodyType<BulkLearnRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkLearnFromStreamers>>, TError,{data: BodyType<BulkLearnRequest>}, TContext> => {
+
+const mutationKey = ['bulkLearnFromStreamers'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkLearnFromStreamers>>, {data: BodyType<BulkLearnRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkLearnFromStreamers(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkLearnFromStreamersMutationResult = NonNullable<Awaited<ReturnType<typeof bulkLearnFromStreamers>>>
+    export type BulkLearnFromStreamersMutationBody = BodyType<BulkLearnRequest>
+    export type BulkLearnFromStreamersMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Learn from multiple preset Russian CS2 streamers at once
+ */
+export const useBulkLearnFromStreamers = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkLearnFromStreamers>>, TError,{data: BodyType<BulkLearnRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkLearnFromStreamers>>,
+        TError,
+        {data: BodyType<BulkLearnRequest>},
+        TContext
+      > => {
+      return useMutation(getBulkLearnFromStreamersMutationOptions(options));
     }
 
 export const getGetStatsUrl = () => {

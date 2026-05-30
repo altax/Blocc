@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetPatternsParams = {
-limit?: number;
-language?: string;
-game?: string;
-};
+export interface BulkLearnResponse {
+  success: boolean;
+  channels_queued: string[];
+  total_channels: number;
+}

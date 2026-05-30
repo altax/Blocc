@@ -59,6 +59,9 @@ export const GetSettingsResponse = zod.object({
   "id": zod.number(),
   "channel_name": zod.string(),
   "bot_username": zod.string(),
+  "twitch_oauth_token": zod.string().optional(),
+  "openai_api_key": zod.string().optional(),
+  "gemini_api_key": zod.string().optional(),
   "personality": zod.string(),
   "min_delay_seconds": zod.number(),
   "max_delay_seconds": zod.number(),
@@ -79,6 +82,9 @@ export const GetSettingsResponse = zod.object({
 export const UpdateSettingsBody = zod.object({
   "channel_name": zod.string().optional(),
   "bot_username": zod.string().optional(),
+  "twitch_oauth_token": zod.string().optional(),
+  "openai_api_key": zod.string().optional(),
+  "gemini_api_key": zod.string().optional(),
   "personality": zod.string().optional(),
   "min_delay_seconds": zod.number().optional(),
   "max_delay_seconds": zod.number().optional(),
@@ -94,6 +100,9 @@ export const UpdateSettingsResponse = zod.object({
   "id": zod.number(),
   "channel_name": zod.string(),
   "bot_username": zod.string(),
+  "twitch_oauth_token": zod.string().optional(),
+  "openai_api_key": zod.string().optional(),
+  "gemini_api_key": zod.string().optional(),
   "personality": zod.string(),
   "min_delay_seconds": zod.number(),
   "max_delay_seconds": zod.number(),
@@ -151,18 +160,22 @@ export const GetMessagesResponse = zod.array(GetMessagesResponseItem)
 /**
  * @summary Get learned chat patterns
  */
-export const getPatternsQueryLimitDefault = 50;
+export const getPatternsQueryLimitDefault = 100;
 
 export const GetPatternsQueryParams = zod.object({
-  "limit": zod.coerce.number().default(getPatternsQueryLimitDefault)
+  "limit": zod.coerce.number().default(getPatternsQueryLimitDefault),
+  "language": zod.coerce.string().optional(),
+  "game": zod.coerce.string().optional()
 })
 
 export const GetPatternsResponseItem = zod.object({
   "id": zod.number(),
   "source_channel": zod.string(),
-  "pattern_type": zod.enum(['reaction', 'hype', 'question', 'joke', 'emote_combo', 'game_specific']),
+  "pattern_type": zod.enum(['reaction', 'hype', 'question', 'joke', 'emote_combo', 'game_specific', 'cs2_callout', 'russian_slang']),
   "content": zod.string(),
   "frequency": zod.number(),
+  "language": zod.string().optional(),
+  "game": zod.string().optional(),
   "created_at": zod.string()
 })
 export const GetPatternsResponse = zod.array(GetPatternsResponseItem)
@@ -182,6 +195,31 @@ export const LearnFromChannelResponse = zod.object({
   "success": zod.boolean(),
   "patterns_found": zod.number(),
   "channel": zod.string()
+})
+
+
+/**
+ * @summary Clear all learned patterns
+ */
+export const ClearPatternsResponse = zod.object({
+  "deleted": zod.number()
+})
+
+
+/**
+ * @summary Learn from multiple preset Russian CS2 streamers at once
+ */
+export const bulkLearnFromStreamersBodyMessageCountPerChannelDefault = 300;
+
+export const BulkLearnFromStreamersBody = zod.object({
+  "channels": zod.array(zod.string()).optional().describe('Custom channel list. If omitted, uses preset Russian CS2 streamers.'),
+  "message_count_per_channel": zod.number().default(bulkLearnFromStreamersBodyMessageCountPerChannelDefault)
+})
+
+export const BulkLearnFromStreamersResponse = zod.object({
+  "success": zod.boolean(),
+  "channels_queued": zod.array(zod.string()),
+  "total_channels": zod.number()
 })
 
 

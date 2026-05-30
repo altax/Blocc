@@ -16,4 +16,6 @@ export const ChatPatternPatternType = {
   joke: 'joke',
   emote_combo: 'emote_combo',
   game_specific: 'game_specific',
+  cs2_callout: 'cs2_callout',
+  russian_slang: 'russian_slang',
 } as const;

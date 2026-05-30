@@ -10,6 +10,9 @@ export interface BotSettings {
   id: number;
   channel_name: string;
   bot_username: string;
+  twitch_oauth_token?: string;
+  openai_api_key?: string;
+  gemini_api_key?: string;
   personality: string;
   min_delay_seconds: number;
   max_delay_seconds: number;

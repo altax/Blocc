@@ -12,13 +12,28 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Save, Bot, Clock, Brain } from "lucide-react";
+import { Save, Bot, Clock, Brain, Key } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
+const DEFAULT_PERSONALITY = `Ты русский зритель CS2 стримов. Пишешь короткие, живые сообщения в чат как настоящий человек.
+
+Твои особенности:
+- Используешь CS2 сленг: флеш, пуш, клатч, нагиб, кт, т-сайд, раш, эйс, ретейк
+- Иногда пишешь русский сленг: кекв, ору, топ, красава, вп, имба, збс, нормис
+- Иногда вставляешь эмоуты: KEKW, PogChamp, monkaS, OMEGALUL, Pog, LUL
+- Пишешь строчными, без знаков препинания в конце
+- Реагируешь эмоционально на красивые моменты, клатчи, фраги
+- Иногда задаёшь вопросы стримеру или чату
+- НЕ пишешь каждые 10 секунд — как реальный зритель
+- НИКОГДА не раскрываешь что ты ИИ`;
+
 const settingsSchema = z.object({
-  channel_name: z.string().min(1, "Channel name is required"),
-  bot_username: z.string().min(1, "Bot username is required"),
-  personality: z.string().min(10, "Personality must be at least 10 characters"),
+  channel_name: z.string().min(1, "Укажи имя канала"),
+  bot_username: z.string().min(1, "Укажи никнейм бота"),
+  twitch_oauth_token: z.string().default(""),
+  openai_api_key: z.string().default(""),
+  gemini_api_key: z.string().default(""),
+  personality: z.string().min(10, "Минимум 10 символов"),
   min_delay_seconds: z.number().min(1).max(60),
   max_delay_seconds: z.number().min(2).max(120),
   cooldown_seconds: z.number().min(0).max(600),
@@ -26,7 +41,7 @@ const settingsSchema = z.object({
   vision_enabled: z.boolean(),
   speech_enabled: z.boolean(),
 }).refine(data => data.min_delay_seconds < data.max_delay_seconds, {
-  message: "Min delay must be less than max delay",
+  message: "Min delay должен быть меньше max delay",
   path: ["max_delay_seconds"]
 });
 
@@ -35,25 +50,18 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const initRef = useRef(false);
 
-  const { data: settings, isLoading } = useGetSettings({ 
-    query: { queryKey: getGetSettingsQueryKey() } 
+  const { data: settings, isLoading } = useGetSettings({
+    query: { queryKey: getGetSettingsQueryKey() }
   });
 
   const updateMutation = useUpdateSettings({
     mutation: {
       onSuccess: () => {
-        toast({
-          title: "Settings saved",
-          description: "Bot configuration has been updated successfully.",
-        });
+        toast({ title: "Настройки сохранены", description: "Конфигурация бота обновлена." });
         queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
       },
       onError: (err: any) => {
-        toast({
-          title: "Error saving settings",
-          description: err.message || "An error occurred.",
-          variant: "destructive",
-        });
+        toast({ title: "Ошибка сохранения", description: err.message || "Что-то пошло не так.", variant: "destructive" });
       }
     }
   });
@@ -63,10 +71,13 @@ export default function Settings() {
     defaultValues: {
       channel_name: "",
       bot_username: "",
-      personality: "",
-      min_delay_seconds: 5,
-      max_delay_seconds: 15,
-      cooldown_seconds: 30,
+      twitch_oauth_token: "",
+      openai_api_key: "",
+      gemini_api_key: "",
+      personality: DEFAULT_PERSONALITY,
+      min_delay_seconds: 8,
+      max_delay_seconds: 35,
+      cooldown_seconds: 90,
       respond_to_chat: true,
       vision_enabled: true,
       speech_enabled: true,
@@ -76,9 +87,12 @@ export default function Settings() {
   useEffect(() => {
     if (settings && !initRef.current) {
       form.reset({
-        channel_name: settings.channel_name,
-        bot_username: settings.bot_username,
-        personality: settings.personality,
+        channel_name: settings.channel_name ?? "",
+        bot_username: settings.bot_username ?? "",
+        twitch_oauth_token: (settings as any).twitch_oauth_token ?? "",
+        openai_api_key: (settings as any).openai_api_key ?? "",
+        gemini_api_key: (settings as any).gemini_api_key ?? "",
+        personality: settings.personality || DEFAULT_PERSONALITY,
         min_delay_seconds: settings.min_delay_seconds,
         max_delay_seconds: settings.max_delay_seconds,
         cooldown_seconds: settings.cooldown_seconds,
@@ -106,18 +120,19 @@ export default function Settings() {
   return (
     <div className="p-6 max-w-4xl mx-auto w-full pb-20">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Configuration</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage core identity, capabilities, and timing behaviors.</p>
+        <h1 className="text-2xl font-bold tracking-tight">Конфигурация</h1>
+        <p className="text-sm text-muted-foreground mt-1">Личность бота, API ключи и параметры поведения.</p>
       </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          
+
+          {/* Identity */}
           <Card className="bg-card/50 border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center text-lg">
                 <Bot className="w-5 h-5 mr-2 text-primary" />
-                Identity & Target
+                Идентификация и цель
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -127,10 +142,8 @@ export default function Settings() {
                   name="bot_username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bot Username</FormLabel>
-                      <FormControl>
-                        <Input className="bg-black/20" {...field} />
-                      </FormControl>
+                      <FormLabel>Никнейм бота (Twitch)</FormLabel>
+                      <FormControl><Input className="bg-black/20" placeholder="mybot123" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -140,10 +153,8 @@ export default function Settings() {
                   name="channel_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Target Channel</FormLabel>
-                      <FormControl>
-                        <Input className="bg-black/20" {...field} />
-                      </FormControl>
+                      <FormLabel>Целевой канал</FormLabel>
+                      <FormControl><Input className="bg-black/20" placeholder="s1mple" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -155,16 +166,15 @@ export default function Settings() {
                 name="personality"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>System Prompt / Personality</FormLabel>
+                    <FormLabel>Системный промпт / Личность</FormLabel>
                     <FormControl>
-                      <Textarea 
-                        className="bg-black/20 min-h-[150px] font-mono text-xs leading-relaxed" 
-                        placeholder="You are a dedicated viewer of the channel..."
-                        {...field} 
+                      <Textarea
+                        className="bg-black/20 min-h-[180px] font-mono text-xs leading-relaxed"
+                        {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      The core directive guiding every decision and message.
+                      Основная директива, определяющая каждое решение и сообщение бота.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -173,73 +183,124 @@ export default function Settings() {
             </CardContent>
           </Card>
 
+          {/* API Keys */}
           <Card className="bg-card/50 border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center text-lg">
-                <Brain className="w-5 h-5 mr-2 text-primary" />
-                Capabilities
+                <Key className="w-5 h-5 mr-2 text-primary" />
+                API ключи
               </CardTitle>
+              <CardDescription>
+                Ключи хранятся в базе данных. Оставь пустым — текущее значение не изменится.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4">
               <FormField
                 control={form.control}
-                name="vision_enabled"
+                name="openai_api_key"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border/50 p-4 bg-black/10">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Computer Vision</FormLabel>
-                      <FormDescription>
-                        Analyze screen captures of the stream video feed.
-                      </FormDescription>
-                    </div>
+                  <FormItem>
+                    <FormLabel>OpenAI API Key</FormLabel>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Input
+                        type="password"
+                        className="bg-black/20 font-mono"
+                        placeholder="sk-proj-..."
+                        {...field}
+                      />
                     </FormControl>
+                    <FormDescription>Нужен для GPT-4o (генерация сообщений) и Whisper (аудио).</FormDescription>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="speech_enabled"
+                name="gemini_api_key"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border/50 p-4 bg-black/10">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Speech Recognition</FormLabel>
-                      <FormDescription>
-                        Transcribe and react to streamer audio.
-                      </FormDescription>
-                    </div>
+                  <FormItem>
+                    <FormLabel>Gemini API Key</FormLabel>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Input
+                        type="password"
+                        className="bg-black/20 font-mono"
+                        placeholder="AIza..."
+                        {...field}
+                      />
                     </FormControl>
+                    <FormDescription>Нужен для Gemini 2.0 Flash (анализ видео стрима).</FormDescription>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="respond_to_chat"
+                name="twitch_oauth_token"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border/50 p-4 bg-black/10">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Chat Interaction</FormLabel>
-                      <FormDescription>
-                        Read and reply to other users in chat.
-                      </FormDescription>
-                    </div>
+                  <FormItem>
+                    <FormLabel>Twitch OAuth Token</FormLabel>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Input
+                        type="password"
+                        className="bg-black/20 font-mono"
+                        placeholder="oauth:..."
+                        {...field}
+                      />
                     </FormControl>
+                    <FormDescription>
+                      Токен аккаунта с правом <code className="text-xs bg-black/30 px-1 rounded">chat:write</code>.
+                      Получить: <span className="text-primary">twitchapps.com/tmi</span>
+                    </FormDescription>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
             </CardContent>
           </Card>
 
+          {/* Capabilities */}
+          <Card className="bg-card/50 border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center text-lg">
+                <Brain className="w-5 h-5 mr-2 text-primary" />
+                Возможности
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {(["vision_enabled", "speech_enabled", "respond_to_chat"] as const).map((name) => {
+                const labels: Record<string, { title: string; desc: string }> = {
+                  vision_enabled: { title: "Компьютерное зрение", desc: "Анализ скриншотов стрима через Gemini." },
+                  speech_enabled: { title: "Распознавание речи", desc: "Транскрипция аудио стримера через Whisper." },
+                  respond_to_chat: { title: "Взаимодействие с чатом", desc: "Чтение и ответы другим пользователям." },
+                };
+                return (
+                  <FormField
+                    key={name}
+                    control={form.control}
+                    name={name}
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border/50 p-4 bg-black/10">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">{labels[name].title}</FormLabel>
+                          <FormDescription>{labels[name].desc}</FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          {/* Timing */}
           <Card className="bg-card/50 border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center text-lg">
                 <Clock className="w-5 h-5 mr-2 text-primary" />
-                Timing & Pacing
+                Тайминги и ритм
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -250,17 +311,11 @@ export default function Settings() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex justify-between">
-                        <span>Min Delay</span>
-                        <span className="text-muted-foreground font-mono">{field.value}s</span>
+                        <span>Мин. задержка</span>
+                        <span className="text-muted-foreground font-mono">{field.value}с</span>
                       </FormLabel>
                       <FormControl>
-                        <Slider 
-                          min={1} 
-                          max={60} 
-                          step={1} 
-                          value={[field.value]} 
-                          onValueChange={(v) => field.onChange(v[0])} 
-                        />
+                        <Slider min={1} max={60} step={1} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -272,17 +327,11 @@ export default function Settings() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="flex justify-between">
-                        <span>Max Delay</span>
-                        <span className="text-muted-foreground font-mono">{field.value}s</span>
+                        <span>Макс. задержка</span>
+                        <span className="text-muted-foreground font-mono">{field.value}с</span>
                       </FormLabel>
                       <FormControl>
-                        <Slider 
-                          min={2} 
-                          max={120} 
-                          step={1} 
-                          value={[field.value]} 
-                          onValueChange={(v) => field.onChange(v[0])} 
-                        />
+                        <Slider min={2} max={120} step={1} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -295,20 +344,14 @@ export default function Settings() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex justify-between">
-                      <span>Message Cooldown</span>
-                      <span className="text-muted-foreground font-mono">{field.value}s</span>
+                      <span>Кулдаун между сообщениями</span>
+                      <span className="text-muted-foreground font-mono">{field.value}с</span>
                     </FormLabel>
                     <FormControl>
-                      <Slider 
-                        min={0} 
-                        max={600} 
-                        step={10} 
-                        value={[field.value]} 
-                        onValueChange={(v) => field.onChange(v[0])} 
-                      />
+                      <Slider min={0} max={600} step={10} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
                     </FormControl>
                     <FormDescription>
-                      Mandatory silence period after sending a message.
+                      Обязательная пауза после отправки сообщения. Рекомендую 60–120с для антидетекта.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -316,8 +359,8 @@ export default function Settings() {
               />
             </CardContent>
             <CardFooter className="bg-black/10 border-t border-border/50 py-4 flex justify-end">
-              <Button type="submit" disabled={updateMutation.isPending} className="min-w-[120px]">
-                {updateMutation.isPending ? "Saving..." : <><Save className="w-4 h-4 mr-2" /> Save Config</>}
+              <Button type="submit" disabled={updateMutation.isPending} className="min-w-[140px]">
+                {updateMutation.isPending ? "Сохранение..." : <><Save className="w-4 h-4 mr-2" />Сохранить</>}
               </Button>
             </CardFooter>
           </Card>

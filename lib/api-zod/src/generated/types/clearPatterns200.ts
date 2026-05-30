@@ -6,8 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type GetPatternsParams = {
-limit?: number;
-language?: string;
-game?: string;
+export type ClearPatterns200 = {
+  deleted: number;
 };

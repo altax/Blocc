@@ -163,7 +163,15 @@ paths:
           in: query
           schema:
             type: integer
-            default: 50
+            default: 100
+        - name: language
+          in: query
+          schema:
+            type: string
+        - name: game
+          in: query
+          schema:
+            type: string
       responses:
         "200":
           description: Patterns
@@ -190,6 +198,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LearnResponse"
+    delete:
+      operationId: clearPatterns
+      tags: [patterns]
+      summary: Clear all learned patterns
+      responses:
+        "200":
+          description: Patterns cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted:
+                    type: integer
+
+  /patterns/bulk-learn:
+    post:
+      operationId: bulkLearnFromStreamers
+      tags: [patterns]
+      summary: Learn from multiple preset Russian CS2 streamers at once
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkLearnRequest"
+      responses:
+        "200":
+          description: Bulk learning started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkLearnResponse"
 
   /stats:
     get:
@@ -252,6 +294,12 @@ components:
           type: string
         bot_username:
           type: string
+        twitch_oauth_token:
+          type: string
+        openai_api_key:
+          type: string
+        gemini_api_key:
+          type: string
         personality:
           type: string
         min_delay_seconds:
@@ -281,6 +329,12 @@ components:
         channel_name:
           type: string
         bot_username:
+          type: string
+        twitch_oauth_token:
+          type: string
+        openai_api_key:
+          type: string
+        gemini_api_key:
           type: string
         personality:
           type: string
@@ -345,11 +399,15 @@ components:
           type: string
         pattern_type:
           type: string
-          enum: [reaction, hype, question, joke, emote_combo, game_specific]
+          enum: [reaction, hype, question, joke, emote_combo, game_specific, cs2_callout, russian_slang]
         content:
           type: string
         frequency:
           type: integer
+        language:
+          type: string
+        game:
+          type: string
         created_at:
           type: string
 
@@ -373,6 +431,31 @@ components:
           type: integer
         channel:
           type: string
+
+    BulkLearnRequest:
+      type: object
+      properties:
+        channels:
+          type: array
+          items:
+            type: string
+          description: "Custom channel list. If omitted, uses preset Russian CS2 streamers."
+        message_count_per_channel:
+          type: integer
+          default: 300
+
+    BulkLearnResponse:
+      type: object
+      required: [success, channels_queued, total_channels]
+      properties:
+        success:
+          type: boolean
+        channels_queued:
+          type: array
+          items:
+            type: string
+        total_channels:
+          type: integer
 
     BotStats:
       type: object

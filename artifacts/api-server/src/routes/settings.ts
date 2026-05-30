@@ -13,23 +13,31 @@ async function getOrCreateSettings() {
   return created;
 }
 
+function serializeSettings(s: typeof botSettingsTable.$inferSelect) {
+  return {
+    id: s.id,
+    channel_name: s.channelName,
+    bot_username: s.botUsername,
+    twitch_oauth_token: s.twitchOauthToken,
+    openai_api_key: s.openaiApiKey,
+    gemini_api_key: s.geminiApiKey,
+    personality: s.personality,
+    min_delay_seconds: s.minDelaySeconds,
+    max_delay_seconds: s.maxDelaySeconds,
+    cooldown_seconds: s.cooldownSeconds,
+    respond_to_chat: s.respondToChat,
+    vision_enabled: s.visionEnabled,
+    speech_enabled: s.speechEnabled,
+    active_hours_start: s.activeHoursStart,
+    active_hours_end: s.activeHoursEnd,
+    created_at: s.createdAt.toISOString(),
+    updated_at: s.updatedAt.toISOString(),
+  };
+}
+
 router.get("/settings", async (req, res): Promise<void> => {
   const settings = await getOrCreateSettings();
-  res.json({
-    ...settings,
-    created_at: settings.createdAt.toISOString(),
-    updated_at: settings.updatedAt.toISOString(),
-    channel_name: settings.channelName,
-    bot_username: settings.botUsername,
-    min_delay_seconds: settings.minDelaySeconds,
-    max_delay_seconds: settings.maxDelaySeconds,
-    cooldown_seconds: settings.cooldownSeconds,
-    respond_to_chat: settings.respondToChat,
-    vision_enabled: settings.visionEnabled,
-    speech_enabled: settings.speechEnabled,
-    active_hours_start: settings.activeHoursStart,
-    active_hours_end: settings.activeHoursEnd,
-  });
+  res.json(serializeSettings(settings));
 });
 
 router.patch("/settings", async (req, res): Promise<void> => {
@@ -46,6 +54,9 @@ router.patch("/settings", async (req, res): Promise<void> => {
 
   if (d.channel_name !== undefined) updateData.channelName = d.channel_name;
   if (d.bot_username !== undefined) updateData.botUsername = d.bot_username;
+  if (d.twitch_oauth_token !== undefined) updateData.twitchOauthToken = d.twitch_oauth_token;
+  if (d.openai_api_key !== undefined) updateData.openaiApiKey = d.openai_api_key;
+  if (d.gemini_api_key !== undefined) updateData.geminiApiKey = d.gemini_api_key;
   if (d.personality !== undefined) updateData.personality = d.personality;
   if (d.min_delay_seconds !== undefined) updateData.minDelaySeconds = d.min_delay_seconds;
   if (d.max_delay_seconds !== undefined) updateData.maxDelaySeconds = d.max_delay_seconds;
@@ -62,21 +73,7 @@ router.patch("/settings", async (req, res): Promise<void> => {
     .where(eq(botSettingsTable.id, settings.id))
     .returning();
 
-  res.json({
-    ...updated,
-    created_at: updated.createdAt.toISOString(),
-    updated_at: updated.updatedAt.toISOString(),
-    channel_name: updated.channelName,
-    bot_username: updated.botUsername,
-    min_delay_seconds: updated.minDelaySeconds,
-    max_delay_seconds: updated.maxDelaySeconds,
-    cooldown_seconds: updated.cooldownSeconds,
-    respond_to_chat: updated.respondToChat,
-    vision_enabled: updated.visionEnabled,
-    speech_enabled: updated.speechEnabled,
-    active_hours_start: updated.activeHoursStart,
-    active_hours_end: updated.activeHoursEnd,
-  });
+  res.json(serializeSettings(updated));
 });
 
 export default router;

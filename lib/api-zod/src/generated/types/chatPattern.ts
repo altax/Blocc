@@ -13,5 +13,7 @@ export interface ChatPattern {
   pattern_type: ChatPatternPatternType;
   content: string;
   frequency: number;
+  language?: string;
+  game?: string;
   created_at: string;
 }

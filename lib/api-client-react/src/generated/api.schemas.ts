@@ -23,6 +23,9 @@ export interface BotSettings {
   id: number;
   channel_name: string;
   bot_username: string;
+  twitch_oauth_token?: string;
+  openai_api_key?: string;
+  gemini_api_key?: string;
   personality: string;
   min_delay_seconds: number;
   max_delay_seconds: number;
@@ -41,6 +44,9 @@ export interface BotSettings {
 export interface BotSettingsUpdate {
   channel_name?: string;
   bot_username?: string;
+  twitch_oauth_token?: string;
+  openai_api_key?: string;
+  gemini_api_key?: string;
   personality?: string;
   min_delay_seconds?: number;
   max_delay_seconds?: number;
@@ -105,6 +111,8 @@ export const ChatPatternPatternType = {
   joke: 'joke',
   emote_combo: 'emote_combo',
   game_specific: 'game_specific',
+  cs2_callout: 'cs2_callout',
+  russian_slang: 'russian_slang',
 } as const;
 
 export interface ChatPattern {
@@ -113,6 +121,8 @@ export interface ChatPattern {
   pattern_type: ChatPatternPatternType;
   content: string;
   frequency: number;
+  language?: string;
+  game?: string;
   created_at: string;
 }
 
@@ -125,6 +135,18 @@ export interface LearnResponse {
   success: boolean;
   patterns_found: number;
   channel: string;
+}
+
+export interface BulkLearnRequest {
+  /** Custom channel list. If omitted, uses preset Russian CS2 streamers. */
+  channels?: string[];
+  message_count_per_channel?: number;
+}
+
+export interface BulkLearnResponse {
+  success: boolean;
+  channels_queued: string[];
+  total_channels: number;
 }
 
 export interface BotStats {
@@ -161,5 +183,11 @@ limit?: number;
 
 export type GetPatternsParams = {
 limit?: number;
+language?: string;
+game?: string;
+};
+
+export type ClearPatterns200 = {
+  deleted: number;
 };
 
