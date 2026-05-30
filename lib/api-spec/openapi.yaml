@@ -3,20 +3,32 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Twitch Bot API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: bot
+    description: Bot control operations
+  - name: settings
+    description: Bot settings
+  - name: logs
+    description: Bot event logs
+  - name: messages
+    description: Bot message history
+  - name: patterns
+    description: Chat learning patterns
+  - name: stats
+    description: Bot statistics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +36,366 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /bot/status:
+    get:
+      operationId: getBotStatus
+      tags: [bot]
+      summary: Get bot status
+      responses:
+        "200":
+          description: Bot status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotStatus"
+
+  /bot/start:
+    post:
+      operationId: startBot
+      tags: [bot]
+      summary: Start the bot
+      responses:
+        "200":
+          description: Bot started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotStatus"
+
+  /bot/stop:
+    post:
+      operationId: stopBot
+      tags: [bot]
+      summary: Stop the bot
+      responses:
+        "200":
+          description: Bot stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotStatus"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get bot settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotSettings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update bot settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BotSettingsUpdate"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotSettings"
+
+  /logs:
+    get:
+      operationId: getLogs
+      tags: [logs]
+      summary: Get recent bot event logs
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [vision, speech, chat, decision, message_sent, error]
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LogEntry"
+
+  /messages:
+    get:
+      operationId: getMessages
+      tags: [messages]
+      summary: Get bot message history
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BotMessage"
+
+  /patterns:
+    get:
+      operationId: getPatterns
+      tags: [patterns]
+      summary: Get learned chat patterns
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Patterns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatPattern"
+    post:
+      operationId: learnFromChannel
+      tags: [patterns]
+      summary: Trigger learning from a Twitch channel's recent chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LearnRequest"
+      responses:
+        "200":
+          description: Learning started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearnResponse"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get bot statistics summary
+      responses:
+        "200":
+          description: Statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BotStats"
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    BotStatus:
+      type: object
+      required: [running, channel, uptime_seconds, messages_sent, last_action]
+      properties:
+        running:
+          type: boolean
+        channel:
+          type: ["string", "null"]
+        uptime_seconds:
+          type: integer
+        messages_sent:
+          type: integer
+        last_action:
+          type: ["string", "null"]
+
+    BotSettings:
+      type: object
+      required:
+        - id
+        - channel_name
+        - bot_username
+        - personality
+        - min_delay_seconds
+        - max_delay_seconds
+        - cooldown_seconds
+        - respond_to_chat
+        - vision_enabled
+        - speech_enabled
+        - active_hours_start
+        - active_hours_end
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+        channel_name:
+          type: string
+        bot_username:
+          type: string
+        personality:
+          type: string
+        min_delay_seconds:
+          type: integer
+        max_delay_seconds:
+          type: integer
+        cooldown_seconds:
+          type: integer
+        respond_to_chat:
+          type: boolean
+        vision_enabled:
+          type: boolean
+        speech_enabled:
+          type: boolean
+        active_hours_start:
+          type: ["integer", "null"]
+        active_hours_end:
+          type: ["integer", "null"]
+        created_at:
+          type: string
+        updated_at:
+          type: string
+
+    BotSettingsUpdate:
+      type: object
+      properties:
+        channel_name:
+          type: string
+        bot_username:
+          type: string
+        personality:
+          type: string
+        min_delay_seconds:
+          type: integer
+        max_delay_seconds:
+          type: integer
+        cooldown_seconds:
+          type: integer
+        respond_to_chat:
+          type: boolean
+        vision_enabled:
+          type: boolean
+        speech_enabled:
+          type: boolean
+        active_hours_start:
+          type: ["integer", "null"]
+        active_hours_end:
+          type: ["integer", "null"]
+
+    LogEntry:
+      type: object
+      required: [id, type, content, created_at]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [vision, speech, chat, decision, message_sent, error]
+        content:
+          type: string
+        metadata:
+          type: ["string", "null"]
+        created_at:
+          type: string
+
+    BotMessage:
+      type: object
+      required: [id, channel, message, trigger_type, created_at]
+      properties:
+        id:
+          type: integer
+        channel:
+          type: string
+        message:
+          type: string
+        trigger_type:
+          type: string
+          enum: [vision, speech, chat_reply, scheduled]
+        context_summary:
+          type: ["string", "null"]
+        created_at:
+          type: string
+
+    ChatPattern:
+      type: object
+      required: [id, source_channel, pattern_type, content, frequency, created_at]
+      properties:
+        id:
+          type: integer
+        source_channel:
+          type: string
+        pattern_type:
+          type: string
+          enum: [reaction, hype, question, joke, emote_combo, game_specific]
+        content:
+          type: string
+        frequency:
+          type: integer
+        created_at:
+          type: string
+
+    LearnRequest:
+      type: object
+      required: [channel]
+      properties:
+        channel:
+          type: string
+        message_count:
+          type: integer
+          default: 500
+
+    LearnResponse:
+      type: object
+      required: [success, patterns_found, channel]
+      properties:
+        success:
+          type: boolean
+        patterns_found:
+          type: integer
+        channel:
+          type: string
+
+    BotStats:
+      type: object
+      required:
+        - total_messages_sent
+        - messages_today
+        - total_patterns_learned
+        - channels_learned_from
+        - uptime_hours
+        - avg_response_delay_seconds
+        - most_common_trigger
+      properties:
+        total_messages_sent:
+          type: integer
+        messages_today:
+          type: integer
+        total_patterns_learned:
+          type: integer
+        channels_learned_from:
+          type: integer
+        uptime_hours:
+          type: number
+        avg_response_delay_seconds:
+          type: number
+        most_common_trigger:
+          type: ["string", "null"]
