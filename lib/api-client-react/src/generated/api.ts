@@ -29,13 +29,21 @@ import type {
   BulkLearnResponse,
   ChatPattern,
   ClearPatterns200,
+  CollectChatRequest,
+  CollectStreamerChat200,
+  DetectLiveRequest,
   GetLogsParams,
   GetMessagesParams,
   GetPatternsParams,
   HealthStatus,
   LearnRequest,
   LearnResponse,
-  LogEntry
+  LiveDetectionResult,
+  LogEntry,
+  PatternEntry,
+  StreamerAnalysis,
+  StreamerFile,
+  StreamerPreset
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1021,6 +1029,457 @@ export function useGetStats<TData = Awaited<ReturnType<typeof getStats>>, TError
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStatsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListStreamersUrl = () => {
+
+
+
+
+  return `/api/streamers`
+}
+
+/**
+ * @summary List all streamers with collected data files
+ */
+export const listStreamers = async ( options?: RequestInit): Promise<StreamerFile[]> => {
+
+  return customFetch<StreamerFile[]>(getListStreamersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListStreamersQueryKey = () => {
+    return [
+    `/api/streamers`
+    ] as const;
+    }
+
+
+export const getListStreamersQueryOptions = <TData = Awaited<ReturnType<typeof listStreamers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStreamers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListStreamersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listStreamers>>> = ({ signal }) => listStreamers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listStreamers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListStreamersQueryResult = NonNullable<Awaited<ReturnType<typeof listStreamers>>>
+export type ListStreamersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all streamers with collected data files
+ */
+
+export function useListStreamers<TData = Awaited<ReturnType<typeof listStreamers>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listStreamers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListStreamersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetStreamerPresetsUrl = () => {
+
+
+
+
+  return `/api/streamers/presets`
+}
+
+/**
+ * @summary Get preset entertainment Russian CS2 streamers
+ */
+export const getStreamerPresets = async ( options?: RequestInit): Promise<StreamerPreset[]> => {
+
+  return customFetch<StreamerPreset[]>(getGetStreamerPresetsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamerPresetsQueryKey = () => {
+    return [
+    `/api/streamers/presets`
+    ] as const;
+    }
+
+
+export const getGetStreamerPresetsQueryOptions = <TData = Awaited<ReturnType<typeof getStreamerPresets>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreamerPresets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamerPresetsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamerPresets>>> = ({ signal }) => getStreamerPresets({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamerPresets>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStreamerPresetsQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamerPresets>>>
+export type GetStreamerPresetsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get preset entertainment Russian CS2 streamers
+ */
+
+export function useGetStreamerPresets<TData = Awaited<ReturnType<typeof getStreamerPresets>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreamerPresets>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStreamerPresetsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDetectLiveChannelsUrl = () => {
+
+
+
+
+  return `/api/streamers/detect-live-sync`
+}
+
+/**
+ * @summary Detect which preset channels are currently live (30s IRC window)
+ */
+export const detectLiveChannels = async (detectLiveRequest?: DetectLiveRequest, options?: RequestInit): Promise<LiveDetectionResult> => {
+
+  return customFetch<LiveDetectionResult>(getDetectLiveChannelsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      detectLiveRequest,)
+  }
+);}
+
+
+
+
+export const getDetectLiveChannelsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof detectLiveChannels>>, TError,{data?: BodyType<DetectLiveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof detectLiveChannels>>, TError,{data?: BodyType<DetectLiveRequest>}, TContext> => {
+
+const mutationKey = ['detectLiveChannels'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof detectLiveChannels>>, {data?: BodyType<DetectLiveRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  detectLiveChannels(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DetectLiveChannelsMutationResult = NonNullable<Awaited<ReturnType<typeof detectLiveChannels>>>
+    export type DetectLiveChannelsMutationBody = BodyType<DetectLiveRequest> | undefined
+    export type DetectLiveChannelsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Detect which preset channels are currently live (30s IRC window)
+ */
+export const useDetectLiveChannels = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof detectLiveChannels>>, TError,{data?: BodyType<DetectLiveRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof detectLiveChannels>>,
+        TError,
+        {data?: BodyType<DetectLiveRequest>},
+        TContext
+      > => {
+      return useMutation(getDetectLiveChannelsMutationOptions(options));
+    }
+
+export const getCollectStreamerChatUrl = (channel: string,) => {
+
+
+
+
+  return `/api/streamers/${channel}/collect`
+}
+
+/**
+ * @summary Start collecting chat from a specific streamer channel
+ */
+export const collectStreamerChat = async (channel: string,
+    collectChatRequest?: CollectChatRequest, options?: RequestInit): Promise<CollectStreamerChat200> => {
+
+  return customFetch<CollectStreamerChat200>(getCollectStreamerChatUrl(channel),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      collectChatRequest,)
+  }
+);}
+
+
+
+
+export const getCollectStreamerChatMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof collectStreamerChat>>, TError,{channel: string;data?: BodyType<CollectChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof collectStreamerChat>>, TError,{channel: string;data?: BodyType<CollectChatRequest>}, TContext> => {
+
+const mutationKey = ['collectStreamerChat'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof collectStreamerChat>>, {channel: string;data?: BodyType<CollectChatRequest>}> = (props) => {
+          const {channel,data} = props ?? {};
+
+          return  collectStreamerChat(channel,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CollectStreamerChatMutationResult = NonNullable<Awaited<ReturnType<typeof collectStreamerChat>>>
+    export type CollectStreamerChatMutationBody = BodyType<CollectChatRequest> | undefined
+    export type CollectStreamerChatMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Start collecting chat from a specific streamer channel
+ */
+export const useCollectStreamerChat = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof collectStreamerChat>>, TError,{channel: string;data?: BodyType<CollectChatRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof collectStreamerChat>>,
+        TError,
+        {channel: string;data?: BodyType<CollectChatRequest>},
+        TContext
+      > => {
+      return useMutation(getCollectStreamerChatMutationOptions(options));
+    }
+
+export const getGetStreamerAnalysisUrl = (channel: string,) => {
+
+
+
+
+  return `/api/streamers/${channel}/analysis`
+}
+
+/**
+ * @summary Get analysis for a specific streamer
+ */
+export const getStreamerAnalysis = async (channel: string, options?: RequestInit): Promise<StreamerAnalysis> => {
+
+  return customFetch<StreamerAnalysis>(getGetStreamerAnalysisUrl(channel),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamerAnalysisQueryKey = (channel: string,) => {
+    return [
+    `/api/streamers/${channel}/analysis`
+    ] as const;
+    }
+
+
+export const getGetStreamerAnalysisQueryOptions = <TData = Awaited<ReturnType<typeof getStreamerAnalysis>>, TError = ErrorType<void>>(channel: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreamerAnalysis>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamerAnalysisQueryKey(channel);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamerAnalysis>>> = ({ signal }) => getStreamerAnalysis(channel, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(channel), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamerAnalysis>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStreamerAnalysisQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamerAnalysis>>>
+export type GetStreamerAnalysisQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get analysis for a specific streamer
+ */
+
+export function useGetStreamerAnalysis<TData = Awaited<ReturnType<typeof getStreamerAnalysis>>, TError = ErrorType<void>>(
+ channel: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreamerAnalysis>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStreamerAnalysisQueryOptions(channel,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetStreamerPatternsUrl = (channel: string,) => {
+
+
+
+
+  return `/api/streamers/${channel}/patterns`
+}
+
+/**
+ * @summary Get saved patterns for a streamer from file
+ */
+export const getStreamerPatterns = async (channel: string, options?: RequestInit): Promise<PatternEntry[]> => {
+
+  return customFetch<PatternEntry[]>(getGetStreamerPatternsUrl(channel),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStreamerPatternsQueryKey = (channel: string,) => {
+    return [
+    `/api/streamers/${channel}/patterns`
+    ] as const;
+    }
+
+
+export const getGetStreamerPatternsQueryOptions = <TData = Awaited<ReturnType<typeof getStreamerPatterns>>, TError = ErrorType<void>>(channel: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreamerPatterns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamerPatternsQueryKey(channel);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamerPatterns>>> = ({ signal }) => getStreamerPatterns(channel, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(channel), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStreamerPatterns>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStreamerPatternsQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamerPatterns>>>
+export type GetStreamerPatternsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get saved patterns for a streamer from file
+ */
+
+export function useGetStreamerPatterns<TData = Awaited<ReturnType<typeof getStreamerPatterns>>, TError = ErrorType<void>>(
+ channel: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStreamerPatterns>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStreamerPatternsQueryOptions(channel,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

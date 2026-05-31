@@ -10,6 +10,7 @@ import Logs from "@/pages/logs";
 import Messages from "@/pages/messages";
 import Patterns from "@/pages/patterns";
 import Settings from "@/pages/settings";
+import Streamers from "@/pages/streamers";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ function Router() {
         <Route path="/logs" component={Logs} />
         <Route path="/messages" component={Messages} />
         <Route path="/patterns" component={Patterns} />
+        <Route path="/streamers" component={Streamers} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>

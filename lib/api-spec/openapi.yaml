@@ -22,6 +22,8 @@ tags:
     description: Chat learning patterns
   - name: stats
     description: Bot statistics
+  - name: streamers
+    description: Per-streamer data collection and analysis
 
 paths:
   /healthz:
@@ -245,6 +247,130 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BotStats"
+
+  /streamers:
+    get:
+      operationId: listStreamers
+      tags: [streamers]
+      summary: List all streamers with collected data files
+      responses:
+        "200":
+          description: Streamers list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StreamerFile"
+
+  /streamers/presets:
+    get:
+      operationId: getStreamerPresets
+      tags: [streamers]
+      summary: Get preset entertainment Russian CS2 streamers
+      responses:
+        "200":
+          description: Preset streamers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StreamerPreset"
+
+  /streamers/detect-live-sync:
+    post:
+      operationId: detectLiveChannels
+      tags: [streamers]
+      summary: Detect which preset channels are currently live (30s IRC window)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DetectLiveRequest"
+      responses:
+        "200":
+          description: Live detection results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveDetectionResult"
+
+  /streamers/{channel}/collect:
+    post:
+      operationId: collectStreamerChat
+      tags: [streamers]
+      summary: Start collecting chat from a specific streamer channel
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CollectChatRequest"
+      responses:
+        "200":
+          description: Collection started
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [started, channel, message_count]
+                properties:
+                  started:
+                    type: boolean
+                  channel:
+                    type: string
+                  message_count:
+                    type: integer
+
+  /streamers/{channel}/analysis:
+    get:
+      operationId: getStreamerAnalysis
+      tags: [streamers]
+      summary: Get analysis for a specific streamer
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Streamer analysis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamerAnalysis"
+        "404":
+          description: No data found
+
+  /streamers/{channel}/patterns:
+    get:
+      operationId: getStreamerPatterns
+      tags: [streamers]
+      summary: Get saved patterns for a streamer from file
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Streamer patterns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PatternEntry"
+        "404":
+          description: No data found
 
 components:
   schemas:
@@ -482,3 +608,158 @@ components:
           type: number
         most_common_trigger:
           type: ["string", "null"]
+
+    DetectLiveRequest:
+      type: object
+      properties:
+        channels:
+          type: array
+          items:
+            type: string
+        window_ms:
+          type: integer
+          default: 30000
+
+    CollectChatRequest:
+      type: object
+      properties:
+        message_count:
+          type: integer
+          default: 500
+
+    StreamerPreset:
+      type: object
+      required: [channel, displayName, description, category, priority]
+      properties:
+        channel:
+          type: string
+        displayName:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [entertainment, pro, variety]
+        priority:
+          type: integer
+
+    StreamerFile:
+      type: object
+      required: [channel, has_raw, has_patterns, has_analysis, total_messages, pattern_count]
+      properties:
+        channel:
+          type: string
+        display_name:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        has_raw:
+          type: boolean
+        has_patterns:
+          type: boolean
+        has_analysis:
+          type: boolean
+        collected_at:
+          type: ["string", "null"]
+        total_messages:
+          type: integer
+        pattern_count:
+          type: integer
+
+    ChannelActivity:
+      type: object
+      required: [channel, message_count, is_live, messages_per_minute]
+      properties:
+        channel:
+          type: string
+        message_count:
+          type: integer
+        is_live:
+          type: boolean
+        messages_per_minute:
+          type: integer
+
+    LiveDetectionResult:
+      type: object
+      required: [results, detected_at]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChannelActivity"
+        detected_at:
+          type: string
+
+    PatternEntry:
+      type: object
+      required: [content, type, frequency, language, game]
+      properties:
+        content:
+          type: string
+        type:
+          type: string
+        frequency:
+          type: integer
+        language:
+          type: string
+        game:
+          type: string
+
+    PatternTypeStat:
+      type: object
+      required: [type, count, percent]
+      properties:
+        type:
+          type: string
+        count:
+          type: integer
+        percent:
+          type: integer
+
+    StreamerStats:
+      type: object
+      required: [total_messages, unique_phrases, ru_ratio, en_ratio, mixed_ratio, cs2_ratio, avg_message_length, top_pattern_types]
+      properties:
+        total_messages:
+          type: integer
+        unique_phrases:
+          type: integer
+        ru_ratio:
+          type: integer
+        en_ratio:
+          type: integer
+        mixed_ratio:
+          type: integer
+        cs2_ratio:
+          type: integer
+        avg_message_length:
+          type: integer
+        top_pattern_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatternTypeStat"
+
+    StreamerAnalysis:
+      type: object
+      required: [channel, analyzed_at, stats, top_phrases, sample_messages, style_notes]
+      properties:
+        channel:
+          type: string
+        analyzed_at:
+          type: string
+        stats:
+          $ref: "#/components/schemas/StreamerStats"
+        top_phrases:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatternEntry"
+        sample_messages:
+          type: array
+          items:
+            type: string
+        style_notes:
+          type: array
+          items:
+            type: string

@@ -237,3 +237,128 @@ export const GetStatsResponse = zod.object({
 })
 
 
+/**
+ * @summary List all streamers with collected data files
+ */
+export const ListStreamersResponseItem = zod.object({
+  "channel": zod.string(),
+  "display_name": zod.string().optional(),
+  "category": zod.string().optional(),
+  "description": zod.string().optional(),
+  "has_raw": zod.boolean(),
+  "has_patterns": zod.boolean(),
+  "has_analysis": zod.boolean(),
+  "collected_at": zod.string().nullish(),
+  "total_messages": zod.number(),
+  "pattern_count": zod.number()
+})
+export const ListStreamersResponse = zod.array(ListStreamersResponseItem)
+
+
+/**
+ * @summary Get preset entertainment Russian CS2 streamers
+ */
+export const GetStreamerPresetsResponseItem = zod.object({
+  "channel": zod.string(),
+  "displayName": zod.string(),
+  "description": zod.string(),
+  "category": zod.enum(['entertainment', 'pro', 'variety']),
+  "priority": zod.number()
+})
+export const GetStreamerPresetsResponse = zod.array(GetStreamerPresetsResponseItem)
+
+
+/**
+ * @summary Detect which preset channels are currently live (30s IRC window)
+ */
+export const detectLiveChannelsBodyWindowMsDefault = 30000;
+
+export const DetectLiveChannelsBody = zod.object({
+  "channels": zod.array(zod.string()).optional(),
+  "window_ms": zod.number().default(detectLiveChannelsBodyWindowMsDefault)
+})
+
+export const DetectLiveChannelsResponse = zod.object({
+  "results": zod.array(zod.object({
+  "channel": zod.string(),
+  "message_count": zod.number(),
+  "is_live": zod.boolean(),
+  "messages_per_minute": zod.number()
+})),
+  "detected_at": zod.string()
+})
+
+
+/**
+ * @summary Start collecting chat from a specific streamer channel
+ */
+export const CollectStreamerChatParams = zod.object({
+  "channel": zod.coerce.string()
+})
+
+export const collectStreamerChatBodyMessageCountDefault = 500;
+
+export const CollectStreamerChatBody = zod.object({
+  "message_count": zod.number().default(collectStreamerChatBodyMessageCountDefault)
+})
+
+export const CollectStreamerChatResponse = zod.object({
+  "started": zod.boolean(),
+  "channel": zod.string(),
+  "message_count": zod.number()
+})
+
+
+/**
+ * @summary Get analysis for a specific streamer
+ */
+export const GetStreamerAnalysisParams = zod.object({
+  "channel": zod.coerce.string()
+})
+
+export const GetStreamerAnalysisResponse = zod.object({
+  "channel": zod.string(),
+  "analyzed_at": zod.string(),
+  "stats": zod.object({
+  "total_messages": zod.number(),
+  "unique_phrases": zod.number(),
+  "ru_ratio": zod.number(),
+  "en_ratio": zod.number(),
+  "mixed_ratio": zod.number(),
+  "cs2_ratio": zod.number(),
+  "avg_message_length": zod.number(),
+  "top_pattern_types": zod.array(zod.object({
+  "type": zod.string(),
+  "count": zod.number(),
+  "percent": zod.number()
+}))
+}),
+  "top_phrases": zod.array(zod.object({
+  "content": zod.string(),
+  "type": zod.string(),
+  "frequency": zod.number(),
+  "language": zod.string(),
+  "game": zod.string()
+})),
+  "sample_messages": zod.array(zod.string()),
+  "style_notes": zod.array(zod.string())
+})
+
+
+/**
+ * @summary Get saved patterns for a streamer from file
+ */
+export const GetStreamerPatternsParams = zod.object({
+  "channel": zod.coerce.string()
+})
+
+export const GetStreamerPatternsResponseItem = zod.object({
+  "content": zod.string(),
+  "type": zod.string(),
+  "frequency": zod.number(),
+  "language": zod.string(),
+  "game": zod.string()
+})
+export const GetStreamerPatternsResponse = zod.array(GetStreamerPatternsResponseItem)
+
+

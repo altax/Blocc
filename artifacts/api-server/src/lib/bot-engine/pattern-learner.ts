@@ -3,13 +3,20 @@ import { db } from "@workspace/db";
 import { chatPatternsTable } from "@workspace/db";
 import { logger } from "../logger";
 import { getPresetChannels } from "../cs2-ru-streamers";
+import {
+  saveRawSamples,
+  savePatternFile,
+  analyzeAndSave,
+  type RawSample,
+  type PatternEntry,
+} from "../streamer-analyzer";
 
 interface RawMessage {
   user: string;
   text: string;
 }
 
-function detectLanguage(text: string): "ru" | "en" | "mixed" {
+export function detectLanguage(text: string): "ru" | "en" | "mixed" {
   const cyrillicCount = (text.match(/[\u0400-\u04FF]/g) || []).length;
   const latinCount = (text.match(/[a-zA-Z]/g) || []).length;
   if (cyrillicCount > 0 && latinCount > 0) return "mixed";
@@ -17,50 +24,35 @@ function detectLanguage(text: string): "ru" | "en" | "mixed" {
   return "en";
 }
 
-function detectGame(text: string): string {
+export function detectGame(text: string): string {
   const t = text.toLowerCase();
-  if (/cs2|csgo|counter.?strike|флеш|флэш|смок|пуш|раш|ретейк|awp|ak-?47|rifle|pistol|ct|terrorist|нuke|inferno|mirage|dust|overpass|anubis|vertigo|5к|4к|3к|ace|клатч|clutch|eco|форс/i.test(t)) {
+  if (/cs2|csgo|counter.?strike|флеш|флэш|смок|пуш|раш|ретейк|awp|ak-?47|rifle|pistol|ct|terrorist|inferno|mirage|dust|overpass|anubis|vertigo|5к|4к|3к|ace|клатч|clutch|eco|форс/i.test(t)) {
     return "cs2";
   }
   return "other";
 }
 
-function classifyPattern(text: string): string {
+export function classifyPattern(text: string): string {
   const t = text.toLowerCase();
-
-  // CS2-специфичные каллауты и игровые фразы
   if (/пуш|флеш|флэш|смок|кидай|кидаем|тикай|ретейк|расти|ротейт|холд|форсим|форс|eco|full.?buy|хл|5к|4к|3к|ace|клатч|clutch|раш|ресет|кемп|боксить|пикать|пик|кт|т-сайд|б-сайт|а-сайт/i.test(t)) {
     return "cs2_callout";
   }
-
-  // Русский сленг и мемы чата
   if (/кекв|кек(?!\w)|лол(?!\w)|хаха|ахах|ору|орнул|орём|хд(?!\w)|кринж|краш(?!\w)|красавчик|красава|вп(?!\w)|нагиб|имба|клоун|боже|ну и|да ладно|топчик|топ(?!\w)|пг(?!\w)|пикча|фанфары|збс|зашквар|нормис|варп/i.test(t)) {
     return "russian_slang";
   }
-
-  // Hype / восторг
-  if (/pog|pogchamp|letsgo|lets.?go|clap|omegalul|hypе|peepo|widepeepo|chatting|siuuu|gg(?!\w)|ez(?!\w)|пог|погgeRS/i.test(t)) {
+  if (/pog|pogchamp|letsgo|lets.?go|clap|omegalul|peepo|widepeepo|chatting|siuuu|gg(?!\w)|ez(?!\w)|пог/i.test(t)) {
     return "hype";
   }
-
-  // Английский юмор
   if (/lul(?!\w)|lmao|lol(?!\w)|kekw|4head|omegalul|haha|xd(?!\w)/i.test(t)) {
     return "joke";
   }
-
-  // Вопросы
   if (text.includes("?")) return "question";
-
-  // Короткие эмоут-комбо (≤3 слова, есть капс или кириллица)
   if (text.split(" ").length <= 3 && (/[A-Z]{3,}/.test(text) || /[А-ЯЁ]{2,}/.test(text))) {
     return "emote_combo";
   }
-
-  // Реакции-согласия
   if (/точно|именно|конечно|факт|правда|согласен|да(?!\w)|нет(?!\w)|ладно|react|same|agreed|fr(?!\w)|ngl|imo/i.test(t)) {
     return "reaction";
   }
-
   return "game_specific";
 }
 
@@ -73,10 +65,7 @@ function isHumanLike(text: string): boolean {
   return true;
 }
 
-export async function collectPatternsFromChannel(
-  channel: string,
-  messageCount = 500
-): Promise<number> {
+function collectViaIRC(channel: string, messageCount: number): Promise<RawMessage[]> {
   return new Promise((resolve, reject) => {
     const messages: RawMessage[] = [];
     let buffer = "";
@@ -88,12 +77,12 @@ export async function collectPatternsFromChannel(
       if (resolved) return;
       resolved = true;
       socket.destroy();
-      savePatterns(channel, messages).then(resolve).catch(reject);
+      resolve(messages);
     };
 
     socket.connect(6667, "irc.chat.twitch.tv", () => {
       socket.write("PASS SCHMOOPIIE\r\n");
-      socket.write("NICK justinfan" + Math.floor(Math.random() * 99999) + "\r\n");
+      socket.write(`NICK justinfan${Math.floor(Math.random() * 99999)}\r\n`);
       socket.write(`JOIN #${channel.toLowerCase()}\r\n`);
     });
 
@@ -101,30 +90,32 @@ export async function collectPatternsFromChannel(
       buffer += data.toString();
       const lines = buffer.split("\r\n");
       buffer = lines.pop() ?? "";
-
       for (const line of lines) {
-        if (line.startsWith("PING")) {
-          socket.write(`PONG${line.slice(4)}\r\n`);
-        }
-
+        if (line.startsWith("PING")) socket.write(`PONG${line.slice(4)}\r\n`);
         const match = line.match(/:(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)/);
         if (match) {
-          const [, , text] = match;
-          if (isHumanLike(text)) {
-            messages.push({ user: match[1], text });
-          }
+          const [, user, text] = match;
+          if (isHumanLike(text)) messages.push({ user, text });
           if (messages.length >= messageCount) done();
         }
       }
     });
 
     socket.on("error", (err) => {
-      logger.error({ err, channel }, "Pattern collection IRC error");
+      logger.error({ err, channel }, "IRC error during collection");
       if (!resolved) { resolved = true; reject(err); }
     });
 
     setTimeout(() => { if (!resolved) done(); }, 300_000);
   });
+}
+
+export async function collectPatternsFromChannel(
+  channel: string,
+  messageCount = 500
+): Promise<number> {
+  const messages = await collectViaIRC(channel, messageCount);
+  return savePatterns(channel, messages);
 }
 
 export async function bulkLearnFromStreamers(
@@ -168,17 +159,16 @@ async function savePatterns(channel: string, messages: RawMessage[]): Promise<nu
     }
   }
 
-  // Сортируем — приоритет: русский язык, cs2, высокая частота
   const sorted = Array.from(patternMap.entries()).sort((a, b) => {
     const score = (e: typeof a) =>
       (e[1].lang === "ru" ? 3 : e[1].lang === "mixed" ? 1 : 0) +
-      (e[1].game === "cs2" ? 2 : 0) +
-      e[1].count;
+      (e[1].game === "cs2" ? 2 : 0) + e[1].count;
     return score(b) - score(a);
   });
 
   const toSave = sorted.slice(0, 250);
 
+  // 1. Сохраняем в PostgreSQL
   for (const [content, { count, type, lang, game }] of toSave) {
     await db
       .insert(chatPatternsTable)
@@ -186,6 +176,27 @@ async function savePatterns(channel: string, messages: RawMessage[]): Promise<nu
       .onConflictDoNothing();
   }
 
-  logger.info({ channel, saved: toSave.length }, "Saved chat patterns");
+  // 2. Сохраняем raw семплы в файл
+  const rawSamples: RawSample[] = messages.map((m) => ({
+    user: m.user,
+    text: m.text,
+    timestamp: new Date().toISOString(),
+  }));
+  saveRawSamples(channel, rawSamples);
+
+  // 3. Сохраняем паттерны в файл
+  const patternEntries: PatternEntry[] = toSave.map(([content, { count, type, lang, game }]) => ({
+    content,
+    type,
+    frequency: count,
+    language: lang,
+    game,
+  }));
+  savePatternFile(channel, patternEntries);
+
+  // 4. Генерируем и сохраняем анализ
+  analyzeAndSave(channel, rawSamples, patternEntries);
+
+  logger.info({ channel, saved: toSave.length }, "Saved chat patterns + files");
   return toSave.length;
 }

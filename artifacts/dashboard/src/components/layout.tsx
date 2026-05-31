@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, LayoutDashboard, Settings, MessageSquareText, Hash, TerminalSquare, Power, PowerOff } from "lucide-react";
+import { Activity, LayoutDashboard, Settings, MessageSquareText, Hash, TerminalSquare, Power, PowerOff, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetBotStatus, useStartBot, useStopBot, getGetBotStatusQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -36,6 +36,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/logs", label: "Live Logs", icon: TerminalSquare },
     { href: "/messages", label: "Messages", icon: MessageSquareText },
+    { href: "/streamers", label: "Стримеры", icon: Users },
     { href: "/patterns", label: "Patterns", icon: Hash },
     { href: "/settings", label: "Settings", icon: Settings },
   ];

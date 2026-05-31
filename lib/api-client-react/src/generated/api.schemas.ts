@@ -160,6 +160,92 @@ export interface BotStats {
   most_common_trigger: string | null;
 }
 
+export interface DetectLiveRequest {
+  channels?: string[];
+  window_ms?: number;
+}
+
+export interface CollectChatRequest {
+  message_count?: number;
+}
+
+export type StreamerPresetCategory = typeof StreamerPresetCategory[keyof typeof StreamerPresetCategory];
+
+
+export const StreamerPresetCategory = {
+  entertainment: 'entertainment',
+  pro: 'pro',
+  variety: 'variety',
+} as const;
+
+export interface StreamerPreset {
+  channel: string;
+  displayName: string;
+  description: string;
+  category: StreamerPresetCategory;
+  priority: number;
+}
+
+export interface StreamerFile {
+  channel: string;
+  display_name?: string;
+  category?: string;
+  description?: string;
+  has_raw: boolean;
+  has_patterns: boolean;
+  has_analysis: boolean;
+  /** @nullable */
+  collected_at?: string | null;
+  total_messages: number;
+  pattern_count: number;
+}
+
+export interface ChannelActivity {
+  channel: string;
+  message_count: number;
+  is_live: boolean;
+  messages_per_minute: number;
+}
+
+export interface LiveDetectionResult {
+  results: ChannelActivity[];
+  detected_at: string;
+}
+
+export interface PatternEntry {
+  content: string;
+  type: string;
+  frequency: number;
+  language: string;
+  game: string;
+}
+
+export interface PatternTypeStat {
+  type: string;
+  count: number;
+  percent: number;
+}
+
+export interface StreamerStats {
+  total_messages: number;
+  unique_phrases: number;
+  ru_ratio: number;
+  en_ratio: number;
+  mixed_ratio: number;
+  cs2_ratio: number;
+  avg_message_length: number;
+  top_pattern_types: PatternTypeStat[];
+}
+
+export interface StreamerAnalysis {
+  channel: string;
+  analyzed_at: string;
+  stats: StreamerStats;
+  top_phrases: PatternEntry[];
+  sample_messages: string[];
+  style_notes: string[];
+}
+
 export type GetLogsParams = {
 limit?: number;
 type?: GetLogsType;
@@ -189,5 +275,11 @@ game?: string;
 
 export type ClearPatterns200 = {
   deleted: number;
+};
+
+export type CollectStreamerChat200 = {
+  started: boolean;
+  channel: string;
+  message_count: number;
 };
 

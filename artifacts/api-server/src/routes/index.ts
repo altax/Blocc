@@ -6,6 +6,7 @@ import logsRouter from "./logs";
 import messagesRouter from "./messages";
 import patternsRouter from "./patterns";
 import statsRouter from "./stats";
+import streamersRouter from "./streamers";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(logsRouter);
 router.use(messagesRouter);
 router.use(patternsRouter);
 router.use(statsRouter);
+router.use(streamersRouter);
 
 export default router;
