@@ -798,7 +798,7 @@ components:
 
     ChannelActivity:
       type: object
-      required: [channel, message_count, is_live, messages_per_minute]
+      required: [channel, message_count, is_live, messages_per_minute, is_cs2]
       properties:
         channel:
           type: string
@@ -808,6 +808,10 @@ components:
           type: boolean
         messages_per_minute:
           type: integer
+        game_name:
+          type: ["string", "null"]
+        is_cs2:
+          type: boolean
 
     LiveDetectionResult:
       type: object

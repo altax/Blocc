@@ -132,7 +132,15 @@ class AutoScheduler {
 
     logger.info({ live }, "Scheduler: live detection done");
 
-    for (const channel of live) {
+    // Фильтруем только CS2-каналы
+    const cs2Live = results.filter((r) => r.is_cs2).map((r) => r.channel);
+    const nonCS2Live = results.filter((r) => r.is_live && !r.is_cs2).map((r) => `${r.channel}(${r.game_name ?? "?"})`);
+
+    if (nonCS2Live.length > 0) {
+      logger.info({ nonCS2Live }, "Scheduler: skipping non-CS2 streamers");
+    }
+
+    for (const channel of cs2Live) {
       const lastCollected = this.lastCollectedAt.get(channel) ?? 0;
       const timeSince = Date.now() - lastCollected;
 

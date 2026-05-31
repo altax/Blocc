@@ -11,4 +11,7 @@ export interface ChannelActivity {
   message_count: number;
   is_live: boolean;
   messages_per_minute: number;
+  /** @nullable */
+  game_name?: string | null;
+  is_cs2: boolean;
 }

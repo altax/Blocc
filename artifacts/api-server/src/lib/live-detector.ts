@@ -1,16 +1,20 @@
 import * as net from "net";
 import { logger } from "./logger";
+import { batchCheckGames, isCS2Game } from "./game-detector";
 
 export interface ChannelActivity {
   channel: string;
   message_count: number;
   is_live: boolean;
   messages_per_minute: number;
+  game_name: string | null;
+  is_cs2: boolean;
 }
 
 /**
  * Подключается ко всем каналам одновременно через IRC.
  * Считает количество сообщений за windowMs мс.
+ * Затем проверяет через Twitch GQL какую игру стримит каждый живой канал.
  * Каналы с >5 сообщений считаются живыми.
  */
 export async function detectLiveChannels(
@@ -55,7 +59,7 @@ export async function detectLiveChannels(
   // Подключаемся ко всем каналам параллельно
   await Promise.allSettled(channels.map(connectChannel));
 
-  // Ждём окно наблюдения
+  // Ждём окно наблюдения (параллельно идёт GQL-запрос для онлайн-каналов)
   await new Promise((r) => setTimeout(r, windowMs));
 
   // Закрываем все сокеты
@@ -65,19 +69,37 @@ export async function detectLiveChannels(
 
   const windowMinutes = windowMs / 60_000;
 
+  // Определяем живые каналы по IRC-активности
+  const liveChannels = channels.filter((ch) => (counts.get(ch) ?? 0) >= 5);
+
+  // Параллельно запрашиваем игру для всех живых каналов через Twitch GQL
+  const gameMap = liveChannels.length > 0
+    ? await batchCheckGames(liveChannels)
+    : new Map();
+
   const results: ChannelActivity[] = channels.map((channel) => {
     const count = counts.get(channel) ?? 0;
+    const isLive = count >= 5;
+    const gameInfo = gameMap.get(channel);
+    const gameName = gameInfo?.game_name ?? null;
+
     return {
       channel,
       message_count: count,
-      is_live: count >= 5,
+      is_live: isLive,
       messages_per_minute: Math.round(count / windowMinutes),
+      game_name: gameName,
+      is_cs2: isLive ? isCS2Game(gameName) : false,
     };
   });
 
-  // Сортируем по активности
-  results.sort((a, b) => b.message_count - a.message_count);
+  // Сортируем: сначала CS2-онлайн, потом другие онлайн, потом оффлайн
+  results.sort((a, b) => {
+    if (a.is_cs2 !== b.is_cs2) return a.is_cs2 ? -1 : 1;
+    if (a.is_live !== b.is_live) return a.is_live ? -1 : 1;
+    return b.message_count - a.message_count;
+  });
 
-  logger.info({ results }, "Live detection complete");
+  logger.info({ results: results.map((r) => ({ ch: r.channel, live: r.is_live, cs2: r.is_cs2, game: r.game_name })) }, "Live detection complete");
   return results;
 }

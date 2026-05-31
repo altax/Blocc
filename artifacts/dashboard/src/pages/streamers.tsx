@@ -4,6 +4,7 @@ import {
   useCollectStreamerChat, useGetStreamerAnalysis, getGetStreamerAnalysisQueryKey,
   useGetSchedulerStatus, useStartScheduler, useStopScheduler, useRunSchedulerNow,
   getGetSchedulerStatusQueryKey,
+  type ChannelActivity,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export default function Streamers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [detecting, setDetecting] = useState(false);
-  const [liveResults, setLiveResults] = useState<Array<{ channel: string; message_count: number; is_live: boolean; messages_per_minute: number }> | null>(null);
+  const [liveResults, setLiveResults] = useState<ChannelActivity[] | null>(null);
   const [collecting, setCollecting] = useState<string | null>(null);
   const [expandedChannel, setExpandedChannel] = useState<string | null>(null);
 
@@ -238,21 +239,43 @@ export default function Streamers() {
                 {liveResults.map((r) => (
                   <div key={r.channel} className={cn(
                     "flex items-center justify-between rounded-lg border px-4 py-3",
-                    r.is_live ? "border-green-500/40 bg-green-500/5" : "border-border/30 opacity-50"
+                    r.is_cs2  ? "border-green-500/40 bg-green-500/5" :
+                    r.is_live ? "border-yellow-500/30 bg-yellow-500/5" :
+                                "border-border/30 opacity-50"
                   )}>
                     <div className="flex items-center gap-3">
-                      <span className={cn("w-2 h-2 rounded-full", r.is_live ? "bg-green-500 animate-pulse" : "bg-muted")} />
+                      <span className={cn("w-2 h-2 rounded-full shrink-0",
+                        r.is_cs2  ? "bg-green-500 animate-pulse" :
+                        r.is_live ? "bg-yellow-500 animate-pulse" : "bg-muted"
+                      )} />
                       <div>
-                        <div className="font-medium text-sm">{presetMap.get(r.channel)?.displayName ?? r.channel}</div>
-                        <div className="text-xs text-muted-foreground">{r.message_count} сообщ. · {r.messages_per_minute} msg/min</div>
+                        <div className="font-medium text-sm flex items-center gap-1.5">
+                          {presetMap.get(r.channel)?.displayName ?? r.channel}
+                          {r.is_live && r.game_name && (
+                            <Badge variant="outline" className={cn(
+                              "text-xs h-4 px-1.5",
+                              r.is_cs2 ? "border-green-500/40 text-green-400" : "border-yellow-500/40 text-yellow-400"
+                            )}>
+                              {r.is_cs2 ? "CS2 ✓" : r.game_name.length > 16 ? r.game_name.slice(0, 14) + "…" : r.game_name}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {r.is_live
+                            ? `${r.message_count} сообщ. · ${r.messages_per_minute} msg/min`
+                            : "оффлайн"}
+                        </div>
                       </div>
                     </div>
-                    {r.is_live && (
+                    {r.is_cs2 && (
                       <Button size="sm" variant="outline" className="h-7 text-xs border-green-500/40 text-green-400 hover:bg-green-500/10"
                         onClick={() => handleCollect(r.channel)} disabled={isCollecting(r.channel)}>
                         {isCollecting(r.channel) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
                         Собрать
                       </Button>
+                    )}
+                    {r.is_live && !r.is_cs2 && (
+                      <span className="text-xs text-yellow-500/70 italic">не CS2</span>
                     )}
                   </div>
                 ))}

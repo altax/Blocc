@@ -373,7 +373,9 @@ export const DetectLiveChannelsResponse = zod.object({
   "channel": zod.string(),
   "message_count": zod.number(),
   "is_live": zod.boolean(),
-  "messages_per_minute": zod.number()
+  "messages_per_minute": zod.number(),
+  "game_name": zod.string().nullish(),
+  "is_cs2": zod.boolean()
 })),
   "detected_at": zod.string()
 })
