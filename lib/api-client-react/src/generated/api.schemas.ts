@@ -160,6 +160,46 @@ export interface BotStats {
   most_common_trigger: string | null;
 }
 
+export type CollectionRecordTrigger = typeof CollectionRecordTrigger[keyof typeof CollectionRecordTrigger];
+
+
+export const CollectionRecordTrigger = {
+  auto: 'auto',
+  manual: 'manual',
+} as const;
+
+export interface CollectionRecord {
+  channel: string;
+  started_at: string;
+  /** @nullable */
+  finished_at?: string | null;
+  /** @nullable */
+  patterns_saved?: number | null;
+  trigger: CollectionRecordTrigger;
+}
+
+export interface SchedulerStatus {
+  running: boolean;
+  check_interval_hours: number;
+  min_collection_interval_hours: number;
+  messages_per_channel: number;
+  /** @nullable */
+  next_check_at?: string | null;
+  /** @nullable */
+  last_check_at?: string | null;
+  last_live_channels: string[];
+  currently_collecting: string[];
+  collection_history: CollectionRecord[];
+  total_auto_collections: number;
+}
+
+export interface SchedulerStartRequest {
+  check_interval_hours?: number;
+  min_collection_interval_hours?: number;
+  messages_per_channel?: number;
+  detection_window_seconds?: number;
+}
+
 export interface DetectLiveRequest {
   channels?: string[];
   window_ms?: number;
@@ -275,6 +315,11 @@ game?: string;
 
 export type ClearPatterns200 = {
   deleted: number;
+};
+
+export type RunSchedulerNow200 = {
+  started: boolean;
+  message: string;
 };
 
 export type CollectStreamerChat200 = {

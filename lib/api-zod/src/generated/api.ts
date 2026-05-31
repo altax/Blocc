@@ -238,6 +238,96 @@ export const GetStatsResponse = zod.object({
 
 
 /**
+ * @summary Get auto-scheduler status
+ */
+export const GetSchedulerStatusResponse = zod.object({
+  "running": zod.boolean(),
+  "check_interval_hours": zod.number(),
+  "min_collection_interval_hours": zod.number(),
+  "messages_per_channel": zod.number(),
+  "next_check_at": zod.string().nullish(),
+  "last_check_at": zod.string().nullish(),
+  "last_live_channels": zod.array(zod.string()),
+  "currently_collecting": zod.array(zod.string()),
+  "collection_history": zod.array(zod.object({
+  "channel": zod.string(),
+  "started_at": zod.string(),
+  "finished_at": zod.string().nullish(),
+  "patterns_saved": zod.number().nullish(),
+  "trigger": zod.enum(['auto', 'manual'])
+})),
+  "total_auto_collections": zod.number()
+})
+
+
+/**
+ * @summary Start or reconfigure the auto-scheduler
+ */
+export const startSchedulerBodyCheckIntervalHoursDefault = 3;
+export const startSchedulerBodyMinCollectionIntervalHoursDefault = 12;
+export const startSchedulerBodyMessagesPerChannelDefault = 300;
+export const startSchedulerBodyDetectionWindowSecondsDefault = 30;
+
+export const StartSchedulerBody = zod.object({
+  "check_interval_hours": zod.number().default(startSchedulerBodyCheckIntervalHoursDefault),
+  "min_collection_interval_hours": zod.number().default(startSchedulerBodyMinCollectionIntervalHoursDefault),
+  "messages_per_channel": zod.number().default(startSchedulerBodyMessagesPerChannelDefault),
+  "detection_window_seconds": zod.number().default(startSchedulerBodyDetectionWindowSecondsDefault)
+})
+
+export const StartSchedulerResponse = zod.object({
+  "running": zod.boolean(),
+  "check_interval_hours": zod.number(),
+  "min_collection_interval_hours": zod.number(),
+  "messages_per_channel": zod.number(),
+  "next_check_at": zod.string().nullish(),
+  "last_check_at": zod.string().nullish(),
+  "last_live_channels": zod.array(zod.string()),
+  "currently_collecting": zod.array(zod.string()),
+  "collection_history": zod.array(zod.object({
+  "channel": zod.string(),
+  "started_at": zod.string(),
+  "finished_at": zod.string().nullish(),
+  "patterns_saved": zod.number().nullish(),
+  "trigger": zod.enum(['auto', 'manual'])
+})),
+  "total_auto_collections": zod.number()
+})
+
+
+/**
+ * @summary Stop the auto-scheduler
+ */
+export const StopSchedulerResponse = zod.object({
+  "running": zod.boolean(),
+  "check_interval_hours": zod.number(),
+  "min_collection_interval_hours": zod.number(),
+  "messages_per_channel": zod.number(),
+  "next_check_at": zod.string().nullish(),
+  "last_check_at": zod.string().nullish(),
+  "last_live_channels": zod.array(zod.string()),
+  "currently_collecting": zod.array(zod.string()),
+  "collection_history": zod.array(zod.object({
+  "channel": zod.string(),
+  "started_at": zod.string(),
+  "finished_at": zod.string().nullish(),
+  "patterns_saved": zod.number().nullish(),
+  "trigger": zod.enum(['auto', 'manual'])
+})),
+  "total_auto_collections": zod.number()
+})
+
+
+/**
+ * @summary Trigger an immediate live detection + auto-collect run
+ */
+export const RunSchedulerNowResponse = zod.object({
+  "started": zod.boolean(),
+  "message": zod.string()
+})
+
+
+/**
  * @summary List all streamers with collected data files
  */
 export const ListStreamersResponseItem = zod.object({

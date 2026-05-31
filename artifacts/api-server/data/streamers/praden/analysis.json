@@ -1,0 +1,312 @@
+{
+  "channel": "praden",
+  "analyzed_at": "2026-05-31T14:48:17.478Z",
+  "stats": {
+    "total_messages": 119,
+    "unique_phrases": 102,
+    "ru_ratio": 45,
+    "en_ratio": 29,
+    "mixed_ratio": 26,
+    "cs2_ratio": 0,
+    "avg_message_length": 20,
+    "top_pattern_types": [
+      {
+        "type": "game_specific",
+        "count": 66,
+        "percent": 59
+      },
+      {
+        "type": "question",
+        "count": 17,
+        "percent": 15
+      },
+      {
+        "type": "reaction",
+        "count": 12,
+        "percent": 11
+      },
+      {
+        "type": "joke",
+        "count": 8,
+        "percent": 7
+      },
+      {
+        "type": "emote_combo",
+        "count": 7,
+        "percent": 6
+      },
+      {
+        "type": "cs2_callout",
+        "count": 1,
+        "percent": 1
+      }
+    ]
+  },
+  "top_phrases": [
+    {
+      "content": "сосал?",
+      "type": "question",
+      "frequency": 2,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "xd",
+      "type": "joke",
+      "frequency": 5,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "Ну продавит и продавит, надежней стоять будет",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "до первого продавит",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "на кухне",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "он вон там",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "сборщик мебели",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "зачем ему лестинца",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "В туалете",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "поищи где дрочил в послединй раз",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Хуй",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "чунить",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Жопич",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Звук доната вебкамщиц",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "а 6 гранник в комплекте был?",
+      "type": "cs2_callout",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "муж на 7 часов - любая задача от 8 часов..",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "минус паркет",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "харош",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "с третьего попал",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "чёт это не выглядит надёжно",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "А нахуя ему железная лестница дома ?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "переверни",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "а че так криво???",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "я бухой слегка зацеплю такое и оно всё рухнет к хуям",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "ламинат значит миллиардер",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "это вообще надёжно не выглядит",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "ты точно правильно делаешь?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "азелитом туда",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "а почему не зеркально прикручиваются?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "я в танке пацаны - че он собирает?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    }
+  ],
+  "sample_messages": [
+    "Ну продавит и продавит, надежней стоять будет",
+    "до первого продавит",
+    "lol",
+    "на кухне",
+    "он вон там",
+    "ты хоть помыл детали перед тем как собирать? @Praden",
+    "сборщик мебели",
+    "зачем ему лестинца",
+    "В туалете",
+    "sus",
+    "поищи где дрочил в послединй раз",
+    "Срал classic",
+    "@Burajimiru из окна гулять ходить",
+    "в последний раз LUL",
+    "@9th__unknown awoo wave",
+    "широкую на широкую FeelsDyslexiaMan",
+    "@BenderBendMe В туалете, все правильно",
+    "@BenderBendMe frfr",
+    "Читерино sus",
+    "ты хоть помыл детали перед тем как собирать? @Praden  󠀀",
+    "Хуй",
+    "muh",
+    "@antipod237 catKISS",
+    "чунить",
+    "сосал?",
+    "Жопич",
+    "))",
+    "сосал?",
+    "Он убьётся ICANTFUCKINGTAKEITANYMORE",
+    "хуй влагалище и широкие бидоны вот Obsent",
+    "Звук доната вебкамщиц",
+    "@Praden сосал вопрос",
+    "а 6 гранник в комплекте был?",
+    "ты хоть помыл детали перед тем как собирать? @Praden  󠀀 󠀀",
+    "муж на 7 часов - любая задача от 8 часов..",
+    "LO",
+    "xd",
+    "xdd",
+    "xd",
+    "sdd",
+    "минус паркет",
+    "харош",
+    "LLO",
+    "с третьего попал",
+    "ICANT",
+    "чёт это не выглядит надёжно",
+    "а че криво sdd",
+    "LO 󠀀",
+    "А нахуя ему железная лестница дома ?",
+    "переверни"
+  ],
+  "style_notes": [
+    "Чат не очень CS2-специфичен, больше эмоций/мемов"
+  ]
+}

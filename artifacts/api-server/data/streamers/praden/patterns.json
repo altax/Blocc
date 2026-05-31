@@ -1,0 +1,721 @@
+{
+  "channel": "praden",
+  "collected_at": "2026-05-31T14:48:17.477Z",
+  "total_patterns": 102,
+  "patterns": [
+    {
+      "content": "сосал?",
+      "type": "question",
+      "frequency": 2,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "xd",
+      "type": "joke",
+      "frequency": 5,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "Ну продавит и продавит, надежней стоять будет",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "до первого продавит",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "на кухне",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "он вон там",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "сборщик мебели",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "зачем ему лестинца",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "В туалете",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "поищи где дрочил в послединй раз",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Хуй",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "чунить",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Жопич",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Звук доната вебкамщиц",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "а 6 гранник в комплекте был?",
+      "type": "cs2_callout",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "муж на 7 часов - любая задача от 8 часов..",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "минус паркет",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "харош",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "с третьего попал",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "чёт это не выглядит надёжно",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "А нахуя ему железная лестница дома ?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "переверни",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "а че так криво???",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "я бухой слегка зацеплю такое и оно всё рухнет к хуям",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "ламинат значит миллиардер",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "это вообще надёжно не выглядит",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "ты точно правильно делаешь?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "азелитом туда",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "а почему не зеркально прикручиваются?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "я в танке пацаны - че он собирает?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "кайф",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "купил квартиру сверху и собирает лестницу",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "маркером закрась",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Может под собственным весом закроется?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "давай Денис старайся",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "а трубка в трубку там не войдёт, не?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "у тебя есть одеяло 6кг, прижми",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "да не, вроде 1 диаметр у них",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "- пол",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "че он собирает?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Вот это он высокий, такие ножки огромные у стула...",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Гуд найс",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "это детская лестница чтобы ты до кровати доставал?",
+      "type": "question",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "да",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Шведская стенка",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "випку",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Ужас какой",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "\"это жопа\" и показывает жопу",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Не ну это реально смешно",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "Ага ДВГ, час пропиздел и чето собирает.... гейминг блять",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "ru",
+      "game": "other"
+    },
+    {
+      "content": "ebalo",
+      "type": "game_specific",
+      "frequency": 3,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "lol",
+      "type": "joke",
+      "frequency": 2,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "ты хоть помыл детали перед тем как собирать? @Praden",
+      "type": "question",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "Срал classic",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "@Burajimiru из окна гулять ходить",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "в последний раз LUL",
+      "type": "joke",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "широкую на широкую FeelsDyslexiaMan",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "@BenderBendMe В туалете, все правильно",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "Читерино sus",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "ты хоть помыл детали перед тем как собирать? @Praden  󠀀",
+      "type": "question",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "Он убьётся ICANTFUCKINGTAKEITANYMORE",
+      "type": "emote_combo",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "хуй влагалище и широкие бидоны вот Obsent",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "@Praden сосал вопрос",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "ты хоть помыл детали перед тем как собирать? @Praden  󠀀 󠀀",
+      "type": "question",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "sdd",
+      "type": "game_specific",
+      "frequency": 2,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "а че криво sdd",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "Чет хуево ssd",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "@Praden DinkDonk КРИВО",
+      "type": "emote_combo",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "Он не помылив собирает? FailFish",
+      "type": "question",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "локи в чате нет PepeChill",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "расслабь болты потом настрой как надо и затягивай уже тогда @Praden",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "@UlDometr До стола не достает",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "он нажеВил HYPE",
+      "type": "emote_combo",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "Как можно подогнать аббревиатуру вариативного гейминга под сборку стеллажа? Накидывайте варианты Obsent",
+      "type": "question",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "Как же оно смачно по этой щели разойдется mmm",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "aga",
+      "type": "game_specific",
+      "frequency": 2,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "пошкрябал весь пол sdd",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "ой балляяять Agreeing",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "@Asexxx стеллаж",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "нах ему лестница? Taa",
+      "type": "question",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "всё качается-шатается, криво.... ну и хуета Obsent @Praden",
+      "type": "russian_slang",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "Лесенка для Кипыча keepy",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "@vymya человек дела, а не слова fr",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "mixed",
+      "game": "other"
+    },
+    {
+      "content": "sus",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "@9th__unknown awoo wave",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "@BenderBendMe frfr",
+      "type": "reaction",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "muh",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "@antipod237 catKISS",
+      "type": "emote_combo",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "))",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "LO",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "xdd",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "LLO",
+      "type": "emote_combo",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "ICANT",
+      "type": "emote_combo",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "LO 󠀀",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "uuh",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "frthinkge",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "tryaska",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "cannyCat",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "Jopa",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "Taah",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "AHAH",
+      "type": "emote_combo",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    },
+    {
+      "content": "Jopa 󠀀",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    }
+  ]
+}

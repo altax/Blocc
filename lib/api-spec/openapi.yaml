@@ -24,6 +24,8 @@ tags:
     description: Bot statistics
   - name: streamers
     description: Per-streamer data collection and analysis
+  - name: scheduler
+    description: Auto-scheduler for live detection and chat collection
 
 paths:
   /healthz:
@@ -247,6 +249,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BotStats"
+
+  /scheduler/status:
+    get:
+      operationId: getSchedulerStatus
+      tags: [scheduler]
+      summary: Get auto-scheduler status
+      responses:
+        "200":
+          description: Scheduler status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStatus"
+
+  /scheduler/start:
+    post:
+      operationId: startScheduler
+      tags: [scheduler]
+      summary: Start or reconfigure the auto-scheduler
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SchedulerStartRequest"
+      responses:
+        "200":
+          description: Scheduler started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStatus"
+
+  /scheduler/stop:
+    post:
+      operationId: stopScheduler
+      tags: [scheduler]
+      summary: Stop the auto-scheduler
+      responses:
+        "200":
+          description: Scheduler stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulerStatus"
+
+  /scheduler/run-now:
+    post:
+      operationId: runSchedulerNow
+      tags: [scheduler]
+      summary: Trigger an immediate live detection + auto-collect run
+      responses:
+        "200":
+          description: Run triggered
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [started, message]
+                properties:
+                  started:
+                    type: boolean
+                  message:
+                    type: string
 
   /streamers:
     get:
@@ -608,6 +673,69 @@ components:
           type: number
         most_common_trigger:
           type: ["string", "null"]
+
+    CollectionRecord:
+      type: object
+      required: [channel, started_at, trigger]
+      properties:
+        channel:
+          type: string
+        started_at:
+          type: string
+        finished_at:
+          type: ["string", "null"]
+        patterns_saved:
+          type: ["integer", "null"]
+        trigger:
+          type: string
+          enum: [auto, manual]
+
+    SchedulerStatus:
+      type: object
+      required: [running, check_interval_hours, min_collection_interval_hours, messages_per_channel, total_auto_collections, last_live_channels, currently_collecting, collection_history]
+      properties:
+        running:
+          type: boolean
+        check_interval_hours:
+          type: number
+        min_collection_interval_hours:
+          type: number
+        messages_per_channel:
+          type: integer
+        next_check_at:
+          type: ["string", "null"]
+        last_check_at:
+          type: ["string", "null"]
+        last_live_channels:
+          type: array
+          items:
+            type: string
+        currently_collecting:
+          type: array
+          items:
+            type: string
+        collection_history:
+          type: array
+          items:
+            $ref: "#/components/schemas/CollectionRecord"
+        total_auto_collections:
+          type: integer
+
+    SchedulerStartRequest:
+      type: object
+      properties:
+        check_interval_hours:
+          type: number
+          default: 3
+        min_collection_interval_hours:
+          type: number
+          default: 12
+        messages_per_channel:
+          type: integer
+          default: 300
+        detection_window_seconds:
+          type: integer
+          default: 30
 
     DetectLiveRequest:
       type: object

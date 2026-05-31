@@ -7,6 +7,7 @@ import messagesRouter from "./messages";
 import patternsRouter from "./patterns";
 import statsRouter from "./stats";
 import streamersRouter from "./streamers";
+import schedulerRouter from "./scheduler";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(messagesRouter);
 router.use(patternsRouter);
 router.use(statsRouter);
 router.use(streamersRouter);
+router.use(schedulerRouter);
 
 export default router;
