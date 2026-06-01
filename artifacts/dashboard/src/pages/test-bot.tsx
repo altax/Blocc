@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { FlaskConical, Zap, ChevronDown, RotateCcw, Loader2, MessageSquare, Brain, AlertCircle } from "lucide-react";
+import { FlaskConical, Zap, Brain, AlertCircle, RotateCcw, Loader2, Database, Hash, Users, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 
 interface Scenario {
   id: string;
@@ -23,6 +22,13 @@ interface TestResult {
   model_used?: string;
 }
 
+interface DatasetStats {
+  total: number;
+  by_channel: { channel: string; count: number }[];
+  by_type: { type: string; count: number }[];
+  top_patterns: { content: string; frequency: number; channel: string }[];
+}
+
 const TYPE_COLORS: Record<string, string> = {
   ace_awp: "text-yellow-400",
   clutch_1v3: "text-orange-400",
@@ -30,6 +36,14 @@ const TYPE_COLORS: Record<string, string> = {
   win_round_pistol: "text-green-400",
   loss_eco: "text-red-400",
   watching_pro: "text-blue-400",
+};
+
+const PATTERN_TYPE_LABELS: Record<string, string> = {
+  word: "слова",
+  phrase: "фразы",
+  emote: "эмоуты",
+  reaction: "реакции",
+  slang: "сленг",
 };
 
 export default function TestBot() {
@@ -50,6 +64,15 @@ export default function TestBot() {
       return r.json();
     },
     staleTime: Infinity,
+  });
+
+  const { data: stats, isLoading: statsLoading } = useQuery<DatasetStats>({
+    queryKey: ["dataset-stats"],
+    queryFn: async () => {
+      const r = await fetch("/api/patterns/dataset-stats");
+      return r.json();
+    },
+    refetchInterval: 15_000,
   });
 
   const testMutation = useMutation({
@@ -92,8 +115,14 @@ export default function TestBot() {
             Задай игровую ситуацию — посмотри что напишет бот
           </p>
         </div>
-        <div className="ml-auto text-xs text-muted-foreground">
-          ИИ реагирует на события, не копирует чат
+        <div className="ml-auto flex items-center gap-3">
+          {stats && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Database className="w-3.5 h-3.5" />
+              <span className="font-mono text-foreground font-medium">{stats.total.toLocaleString()}</span>
+              <span>паттернов в базе</span>
+            </div>
+          )}
         </div>
       </header>
 
@@ -236,19 +265,10 @@ export default function TestBot() {
           </div>
         </div>
 
-        {/* Right: Results */}
+        {/* Right: Results / Dataset info */}
         <div className="flex-1 flex flex-col overflow-y-auto">
-          {!lastResult && !testMutation.isPending && !testMutation.isError && (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
-              <FlaskConical className="w-12 h-12 mb-4 opacity-20" />
-              <div className="text-sm font-medium mb-1">Выбери сценарий или введи свой</div>
-              <div className="text-xs leading-relaxed max-w-sm">
-                ИИ обучен на паттернах реального русского CS2 чата, но пишет
-                по конкретной ситуации — не копирует то что уже написали
-              </div>
-            </div>
-          )}
 
+          {/* Error state */}
           {!lastResult && !testMutation.isPending && testMutation.isError && (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <AlertCircle className="w-10 h-10 mb-3 text-destructive/60" />
@@ -259,15 +279,119 @@ export default function TestBot() {
             </div>
           )}
 
+          {/* Loading */}
           {testMutation.isPending && (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center space-y-3">
                 <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-                <div className="text-sm text-muted-foreground">GPT-4o-mini генерирует...</div>
+                <div className="text-sm text-muted-foreground">Генерирует ответ...</div>
               </div>
             </div>
           )}
 
+          {/* Empty state → Dataset stats */}
+          {!lastResult && !testMutation.isPending && !testMutation.isError && (
+            <div className="p-5 space-y-5">
+              {/* Summary bar */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg border border-border/50 bg-card/40 p-3 text-center">
+                  <div className="text-xl font-bold font-mono text-primary">
+                    {statsLoading ? "…" : (stats?.total ?? 0).toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">паттернов всего</div>
+                </div>
+                <div className="rounded-lg border border-border/50 bg-card/40 p-3 text-center">
+                  <div className="text-xl font-bold font-mono text-primary">
+                    {statsLoading ? "…" : (stats?.by_channel.length ?? 0)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">каналов</div>
+                </div>
+                <div className="rounded-lg border border-border/50 bg-card/40 p-3 text-center">
+                  <div className="text-xl font-bold font-mono text-primary">
+                    {statsLoading ? "…" : (stats?.by_type.length ?? 0)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">типов данных</div>
+                </div>
+              </div>
+
+              {stats && stats.total === 0 && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-400">
+                  База пустая. Запусти обучение на вкладке <strong>Обучение</strong> — собери паттерны из реального чата русских CS2 стримеров.
+                </div>
+              )}
+
+              {stats && stats.total > 0 && (
+                <>
+                  {/* By channel */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <Users className="w-3 h-3" />
+                      Источники (каналы)
+                    </div>
+                    <div className="space-y-1">
+                      {stats.by_channel.map((ch) => {
+                        const pct = Math.round((ch.count / stats.total) * 100);
+                        return (
+                          <div key={ch.channel} className="flex items-center gap-2">
+                            <div className="w-24 shrink-0 font-mono text-[11px] text-foreground truncate">{ch.channel}</div>
+                            <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary/60 rounded-full"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <div className="w-12 text-right font-mono text-[10px] text-muted-foreground">{ch.count.toLocaleString()}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* By type */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <Hash className="w-3 h-3" />
+                      Типы паттернов
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {stats.by_type.map((t) => (
+                        <span
+                          key={t.type}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-border/50 bg-card/50 text-[11px] text-muted-foreground"
+                        >
+                          <span className="text-foreground font-medium">{PATTERN_TYPE_LABELS[t.type] ?? t.type}</span>
+                          <span className="font-mono">{t.count}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Top patterns */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <TrendingUp className="w-3 h-3" />
+                      Топ паттернов (по частоте)
+                    </div>
+                    <div className="space-y-1">
+                      {stats.top_patterns.map((p, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card/40 border border-border/30 hover:border-border/60 transition-colors"
+                        >
+                          <span className="w-5 shrink-0 text-[10px] text-muted-foreground/60 text-right font-mono">{i + 1}</span>
+                          <span className="flex-1 font-mono text-xs text-foreground">{p.content}</span>
+                          <span className="text-[10px] font-mono text-muted-foreground shrink-0">{p.channel}</span>
+                          <span className="text-[10px] font-mono text-primary shrink-0">×{p.frequency}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Results */}
           {lastResult && !testMutation.isPending && (
             <div className="p-5 space-y-6">
               {/* Context recap */}

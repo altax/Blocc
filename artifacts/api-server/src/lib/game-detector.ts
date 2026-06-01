@@ -63,8 +63,8 @@ async function checkBatch(
       const ch = channels[i];
       const userData = result?.data?.[`ch${i}`];
       const stream = userData?.stream;
-      // stream non-null + id присутствует → канал реально стримит
-      const isLive = !!stream && !!stream.id;
+      // stream non-null → канал стримит (id может отсутствовать в кеше Twitch)
+      const isLive = stream != null;
       const gameName = isLive ? (stream!.game?.name ?? null) : null;
       map.set(ch, { game_name: gameName, is_live: isLive });
     }
