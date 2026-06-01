@@ -154,4 +154,106 @@ router.post("/settings/verify-twitch", async (req, res): Promise<void> => {
   }
 });
 
+// Twitch Device Flow — шаг 1: инициализация
+router.post("/settings/twitch-device-flow/start", async (req, res): Promise<void> => {
+  const s = await getOrCreateSettings();
+  const clientId = (req.body as any)?.client_id || s.twitchClientId;
+
+  if (!clientId) {
+    res.status(400).json({ ok: false, error: "Client ID не указан. Сначала сохрани его в настройках." });
+    return;
+  }
+
+  try {
+    const body = new URLSearchParams({
+      client_id: clientId,
+      scopes: "chat:read chat:edit",
+    });
+
+    const resp = await fetch("https://id.twitch.tv/oauth2/device", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    const data = await resp.json() as any;
+
+    if (!resp.ok) {
+      res.status(400).json({ ok: false, error: data?.message || `Ошибка Twitch (${resp.status})` });
+      return;
+    }
+
+    res.json({
+      ok: true,
+      device_code: data.device_code,
+      user_code: data.user_code,
+      verification_uri: data.verification_uri,
+      expires_in: data.expires_in,
+      interval: data.interval ?? 5,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err?.message ?? "Неизвестная ошибка" });
+  }
+});
+
+// Twitch Device Flow — шаг 2: опрос статуса и сохранение токена
+router.post("/settings/twitch-device-flow/poll", async (req, res): Promise<void> => {
+  const { device_code } = req.body as { device_code?: string };
+  const s = await getOrCreateSettings();
+
+  if (!device_code) {
+    res.status(400).json({ ok: false, error: "device_code не указан" });
+    return;
+  }
+
+  if (!s.twitchClientId) {
+    res.status(400).json({ ok: false, error: "Client ID не указан" });
+    return;
+  }
+
+  try {
+    const body = new URLSearchParams({
+      client_id: s.twitchClientId,
+      device_code,
+      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+    });
+
+    if (s.twitchClientSecret) {
+      body.set("client_secret", s.twitchClientSecret);
+    }
+
+    const resp = await fetch("https://id.twitch.tv/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString(),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    const data = await resp.json() as any;
+
+    if (resp.status === 400 && (data?.message === "authorization_pending" || data?.status === 400)) {
+      res.json({ ok: false, pending: true });
+      return;
+    }
+
+    if (!resp.ok) {
+      const errMsg = data?.message || data?.error_description || `Ошибка (${resp.status})`;
+      res.status(400).json({ ok: false, error: errMsg });
+      return;
+    }
+
+    const token = `oauth:${data.access_token}`;
+
+    await db
+      .update(botSettingsTable)
+      .set({ twitchOauthToken: token })
+      .where(eq(botSettingsTable.id, s.id));
+
+    res.json({ ok: true, token });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err?.message ?? "Неизвестная ошибка" });
+  }
+});
+
 export default router;

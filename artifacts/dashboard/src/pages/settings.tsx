@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Save, Bot, Clock, Brain, Key, CheckCircle2, XCircle, Loader2, Radio } from "lucide-react";
+import { Save, Bot, Clock, Brain, Key, CheckCircle2, XCircle, Loader2, Radio, ExternalLink, Tv2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 const DEFAULT_PERSONALITY = `Ты русский зритель CS2 стримов. Пишешь короткие, живые сообщения в чат как настоящий человек.
@@ -54,12 +54,24 @@ interface VerifyResult {
   live_channels?: string[];
 }
 
+interface DeviceFlow {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  interval: number;
+  expiresAt: number;
+  status: "waiting" | "success" | "error";
+  error?: string;
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const initRef = useRef(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
+  const [deviceFlow, setDeviceFlow] = useState<DeviceFlow | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: settings, isLoading } = useGetSettings({
     query: { queryKey: getGetSettingsQueryKey() }
@@ -118,6 +130,87 @@ export default function Settings() {
       initRef.current = true;
     }
   }, [settings, form]);
+
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearTimeout(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const pollDeviceFlow = useCallback((deviceCode: string, interval: number, expiresAt: number) => {
+    if (Date.now() > expiresAt) {
+      setDeviceFlow(prev => prev ? { ...prev, status: "error", error: "Время истекло. Начни заново." } : null);
+      return;
+    }
+    pollTimerRef.current = setTimeout(async () => {
+      try {
+        const resp = await fetch("/api/settings/twitch-device-flow/poll", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ device_code: deviceCode }),
+        });
+        const data = await resp.json();
+        if (data.pending) {
+          pollDeviceFlow(deviceCode, interval, expiresAt);
+        } else if (data.ok && data.token) {
+          stopPolling();
+          setDeviceFlow(prev => prev ? { ...prev, status: "success" } : null);
+          form.setValue("twitch_oauth_token", data.token);
+          queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
+          toast({ title: "Токен получен!", description: "OAuth токен сохранён в базе данных." });
+        } else {
+          stopPolling();
+          setDeviceFlow(prev => prev ? { ...prev, status: "error", error: data.error || "Ошибка" } : null);
+        }
+      } catch {
+        stopPolling();
+        setDeviceFlow(prev => prev ? { ...prev, status: "error", error: "Ошибка сети" } : null);
+      }
+    }, interval * 1000);
+  }, [form, queryClient, stopPolling, toast]);
+
+  const startDeviceFlow = async () => {
+    stopPolling();
+    setDeviceFlow(null);
+    const values = form.getValues();
+    const clientId = values.twitch_client_id;
+    if (!clientId) {
+      toast({ title: "Укажи Client ID", description: "Заполни поле Client ID и сохрани настройки.", variant: "destructive" });
+      return;
+    }
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ twitch_client_id: clientId, twitch_client_secret: values.twitch_client_secret }),
+    });
+    try {
+      const resp = await fetch("/api/settings/twitch-device-flow/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: clientId }),
+      });
+      const data = await resp.json();
+      if (!data.ok) {
+        toast({ title: "Ошибка", description: data.error, variant: "destructive" });
+        return;
+      }
+      const flow: DeviceFlow = {
+        deviceCode: data.device_code,
+        userCode: data.user_code,
+        verificationUri: data.verification_uri,
+        interval: data.interval,
+        expiresAt: Date.now() + data.expires_in * 1000,
+        status: "waiting",
+      };
+      setDeviceFlow(flow);
+      pollDeviceFlow(flow.deviceCode, flow.interval, flow.expiresAt);
+    } catch {
+      toast({ title: "Ошибка сети", variant: "destructive" });
+    }
+  };
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
 
   const onSubmit = (values: z.infer<typeof settingsSchema>) => {
     updateMutation.mutate({ data: values });
@@ -365,17 +458,99 @@ export default function Settings() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Twitch OAuth Token (для чата)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        className="bg-black/20 font-mono"
-                        placeholder="oauth:..."
-                        {...field}
-                      />
-                    </FormControl>
+                    <div className="flex gap-2">
+                      <FormControl>
+                        <Input
+                          type="password"
+                          className="bg-black/20 font-mono"
+                          placeholder="oauth:..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={startDeviceFlow}
+                        disabled={deviceFlow?.status === "waiting"}
+                        className="shrink-0 text-xs gap-1.5"
+                      >
+                        <Tv2 className="w-3.5 h-3.5" />
+                        Получить токен
+                      </Button>
+                    </div>
+
+                    {deviceFlow && (
+                      <div className={`mt-2 rounded-lg border p-4 text-sm space-y-3 ${
+                        deviceFlow.status === "success"
+                          ? "bg-green-950/40 border-green-800/40"
+                          : deviceFlow.status === "error"
+                          ? "bg-red-950/40 border-red-800/40"
+                          : "bg-blue-950/30 border-blue-800/40"
+                      }`}>
+                        {deviceFlow.status === "waiting" && (
+                          <>
+                            <div className="flex items-center gap-2 text-blue-300">
+                              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                              <span className="font-medium">Ожидаем авторизацию...</span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                1. Открой ссылку и войди в аккаунт бота на Twitch:
+                              </p>
+                              <a
+                                href={deviceFlow.verificationUri}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-primary font-medium text-xs hover:underline"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                {deviceFlow.verificationUri}
+                              </a>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">2. Введи этот код:</p>
+                              <div className="inline-flex items-center bg-black/40 rounded-md px-4 py-2 border border-blue-700/50">
+                                <span className="font-mono text-xl font-bold tracking-[0.3em] text-blue-200">
+                                  {deviceFlow.userCode}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Токен запишется автоматически после подтверждения.
+                            </p>
+                          </>
+                        )}
+                        {deviceFlow.status === "success" && (
+                          <div className="flex items-center gap-2 text-green-300">
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span className="font-medium">Токен получен и сохранён!</span>
+                          </div>
+                        )}
+                        {deviceFlow.status === "error" && (
+                          <div className="flex items-center gap-2 text-red-300">
+                            <XCircle className="w-4 h-4 shrink-0" />
+                            <span>{deviceFlow.error}</span>
+                          </div>
+                        )}
+                        {deviceFlow.status !== "waiting" && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeviceFlow(null)}
+                            className="text-xs h-7 px-2"
+                          >
+                            Закрыть
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
                     <FormDescription>
-                      Токен с правом <code className="text-xs bg-black/30 px-1 rounded">chat:write</code> — нужен чтобы бот писал в чат.
-                      Получить: <span className="text-primary font-medium">twitchapps.com/tmi</span>
+                      Токен с правом <code className="text-xs bg-black/30 px-1 rounded">chat:edit</code> — нужен чтобы бот писал в чат.
+                      Нажми «Получить токен» для автоматического получения, или вручную через{" "}
+                      <span className="text-primary font-medium">twitchapps.com/tmi</span>
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
