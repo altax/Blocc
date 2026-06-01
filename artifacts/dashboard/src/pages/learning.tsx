@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { BrainCircuit, Sparkles, TrendingUp, Database, Radio, RefreshCw, ChevronRight } from "lucide-react";
+import { BrainCircuit, Sparkles, TrendingUp, Database, Radio, RefreshCw, ChevronRight, Trash2, FileText, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -283,13 +284,42 @@ function LearningFeed({ events }: { events: LearningEvent[] }) {
 
 // ─── Stats Column ───────────────────────────────────────────────────────────
 
+interface CorpusStats {
+  file: string;
+  total_messages: number;
+  size_bytes: number;
+  exists: boolean;
+}
+
+function formatBytes(b: number): string {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1024 / 1024).toFixed(2)} MB`;
+}
+
 function StatsPanel({
   stats,
   accumulator,
+  onReset,
+  isResetting,
 }: {
   stats: LearningStats | null;
   accumulator: AccumulatorEntry[];
+  onReset: () => void;
+  isResetting: boolean;
 }) {
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  const { data: corpusStats } = useQuery<CorpusStats>({
+    queryKey: ["corpus-stats"],
+    queryFn: async () => {
+      const r = await fetch("/api/corpus/stats");
+      if (!r.ok) throw new Error("corpus stats failed");
+      return r.json();
+    },
+    refetchInterval: 3000,
+  });
+
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border/50">
@@ -298,17 +328,56 @@ function StatsPanel({
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Счётчики */}
-        <div className="grid grid-cols-2 gap-3">
+
+        {/* Corpus file status — главный блок */}
+        <div className={cn(
+          "rounded-lg border p-3 space-y-2",
+          corpusStats?.exists
+            ? "bg-green-500/5 border-green-500/20"
+            : "bg-muted/20 border-border/50"
+        )}>
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-green-400 shrink-0" />
+            <span className="text-xs font-semibold">Корпус обучения</span>
+            <span className={cn(
+              "ml-auto text-[10px] px-1.5 py-0.5 rounded",
+              corpusStats?.exists ? "bg-green-500/15 text-green-400" : "bg-muted/50 text-muted-foreground"
+            )}>
+              {corpusStats?.exists ? "активен" : "пуст"}
+            </span>
+          </div>
+          <div className="font-mono text-[10px] text-muted-foreground break-all">
+            data/corpus/messages.jsonl
+          </div>
+          {corpusStats?.exists && (
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="bg-background/40 rounded p-2">
+                <div className="text-lg font-bold text-green-400 tabular-nums">
+                  {corpusStats.total_messages.toLocaleString()}
+                </div>
+                <div className="text-[10px] text-muted-foreground">сообщений</div>
+              </div>
+              <div className="bg-background/40 rounded p-2">
+                <div className="text-lg font-bold tabular-nums">
+                  {formatBytes(corpusStats.size_bytes)}
+                </div>
+                <div className="text-[10px] text-muted-foreground">размер файла</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Счётчики сессии */}
+        <div className="grid grid-cols-2 gap-2">
           {[
             { label: "Обработано", value: stats?.total_processed ?? 0, color: "text-foreground" },
             { label: "Новых паттернов", value: stats?.total_new_patterns ?? 0, color: "text-green-400" },
             { label: "Обновлено", value: stats?.total_updated_patterns ?? 0, color: "text-blue-400" },
             { label: "Flush в БД", value: stats?.total_batches_flushed ?? 0, color: "text-amber-400" },
           ].map((s) => (
-            <div key={s.label} className="bg-card/50 rounded-lg p-3 border border-border/50">
-              <div className={cn("text-2xl font-bold tabular-nums", s.color)}>{s.value.toLocaleString()}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
+            <div key={s.label} className="bg-card/50 rounded-lg p-2.5 border border-border/50">
+              <div className={cn("text-xl font-bold tabular-nums", s.color)}>{s.value.toLocaleString()}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{s.label}</div>
             </div>
           ))}
         </div>
@@ -328,9 +397,9 @@ function StatsPanel({
           </div>
         )}
 
-        {/* Аккумулятор — что сейчас в памяти */}
+        {/* Аккумулятор */}
         {accumulator.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               В памяти (до flush)
             </div>
@@ -356,11 +425,11 @@ function StatsPanel({
           </div>
         )}
 
-        {/* Per-channel breakdown */}
+        {/* Per-channel */}
         {stats && Object.keys(stats.per_channel).length > 0 && (
           <div className="space-y-2">
             <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">По каналам</div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {Object.entries(stats.per_channel).map(([ch, s]) => (
                 <div key={ch} className="flex items-center gap-2">
                   <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
@@ -376,16 +445,16 @@ function StatsPanel({
           </div>
         )}
 
-        {/* Пояснение пайплайна */}
+        {/* Пайплайн */}
         <div className="rounded-lg border border-border/50 bg-card/30 p-3 space-y-2">
           <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Пайплайн</div>
           <div className="space-y-1.5 text-xs text-muted-foreground">
             {[
-              { icon: "📡", text: "IRC сессия захватывает все сообщения" },
+              { icon: "📡", text: "IRC → все сообщения в messages.jsonl" },
               { icon: "🧠", text: "Каждое сообщение классифицируется on-the-fly" },
-              { icon: "💾", text: "Аккумулируется в памяти (100 сообщ. → flush)" },
-              { icon: "📦", text: "Flush записывает топ-250 паттернов в PostgreSQL" },
-              { icon: "🤖", text: "Бот использует паттерны при генерации ответов" },
+              { icon: "💾", text: "Аккумулятор в памяти → flush каждые 100 сообщ." },
+              { icon: "📦", text: "Топ-250 паттернов (ru+cs2 приоритет) → PostgreSQL" },
+              { icon: "🤖", text: "Бот инжектирует паттерны при генерации ответов" },
             ].map((step, i) => (
               <div key={i} className="flex items-start gap-2">
                 <span className="shrink-0">{step.icon}</span>
@@ -394,6 +463,55 @@ function StatsPanel({
             ))}
           </div>
         </div>
+
+        {/* Сброс обучения */}
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <Trash2 className="w-3.5 h-3.5 text-destructive shrink-0" />
+            <span className="text-xs font-semibold text-destructive">Начать с нуля</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Удалит все паттерны из БД, все записанные сессии. Корпус messages.jsonl будет <strong>архивирован</strong> (не удалён), чтобы данные не пропали.
+          </p>
+          {!confirmReset ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive h-8"
+              onClick={() => setConfirmReset(true)}
+            >
+              <Trash2 className="w-3 h-3 mr-1.5" />
+              Сбросить обучение
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5 text-[11px] text-destructive">
+                <AlertTriangle className="w-3 h-3 shrink-0" />
+                Точно? Это необратимо.
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1 text-xs h-8"
+                  onClick={() => { onReset(); setConfirmReset(false); }}
+                  disabled={isResetting}
+                >
+                  {isResetting ? "Сброс..." : "Да, удалить"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 text-xs h-8"
+                  onClick={() => setConfirmReset(false)}
+                >
+                  Отмена
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
@@ -404,6 +522,7 @@ function StatsPanel({
 export default function Learning() {
   const [allEvents, setAllEvents] = useState<LearningEvent[]>([]);
   const lastIdRef = useRef<string | undefined>(undefined);
+  const queryClient = useQueryClient();
 
   const { data, isError } = useQuery<FeedResponse>({
     queryKey: ["learning-feed"],
@@ -418,6 +537,21 @@ export default function Learning() {
     refetchInterval: 1500,
   });
 
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch("/api/corpus/reset", { method: "POST" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    },
+    onSuccess: () => {
+      // Очищаем локальные события и сбрасываем delta-cursor
+      setAllEvents([]);
+      lastIdRef.current = undefined;
+      queryClient.invalidateQueries({ queryKey: ["corpus-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["learning-feed"] });
+    },
+  });
+
   useEffect(() => {
     if (!data?.events?.length) return;
     setAllEvents((prev) => {
@@ -425,10 +559,8 @@ export default function Learning() {
       const newOnes = data.events.filter((e) => !ids.has(e.id));
       if (!newOnes.length) return prev;
       const merged = [...prev, ...newOnes];
-      // Держим последние 800 событий в памяти
       return merged.slice(-800);
     });
-    // Запоминаем последний id для delta-запросов
     const last = data.events[data.events.length - 1];
     if (last) lastIdRef.current = last.id;
   }, [data]);
@@ -440,9 +572,14 @@ export default function Learning() {
         <BrainCircuit className="w-5 h-5 text-primary" />
         <div>
           <h1 className="text-sm font-semibold">Обучение ИИ</h1>
-          <p className="text-xs text-muted-foreground">Непрерывный self-learning на основе живых IRC сессий</p>
+          <p className="text-xs text-muted-foreground">
+            Непрерывный self-learning — каждое IRC сообщение попадает в корпус и классифицируется
+          </p>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          {resetMutation.isSuccess && (
+            <span className="text-xs text-green-400">База сброшена ✓</span>
+          )}
           {isError && (
             <span className="text-xs text-destructive">Ошибка соединения</span>
           )}
@@ -457,16 +594,13 @@ export default function Learning() {
 
       {/* Three-column layout */}
       <div className="flex-1 grid grid-cols-[1fr_1fr_320px] divide-x divide-border/50 overflow-hidden">
-        {/* Левая колонка: сырой поток */}
         <MessageStream events={allEvents} />
-
-        {/* Центральная: события обучения */}
         <LearningFeed events={allEvents} />
-
-        {/* Правая: статистика */}
         <StatsPanel
           stats={data?.stats ?? null}
           accumulator={data?.accumulator ?? []}
+          onReset={() => resetMutation.mutate()}
+          isResetting={resetMutation.isPending}
         />
       </div>
     </div>

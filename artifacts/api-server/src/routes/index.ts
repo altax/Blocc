@@ -10,6 +10,7 @@ import streamersRouter from "./streamers";
 import schedulerRouter from "./scheduler";
 import sessionsRouter from "./sessions";
 import learningRouter from "./learning";
+import corpusRouter from "./corpus";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(streamersRouter);
 router.use(schedulerRouter);
 router.use(sessionsRouter);
 router.use(learningRouter);
+router.use(corpusRouter);
 
 export default router;

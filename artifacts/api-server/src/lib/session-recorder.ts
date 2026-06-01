@@ -4,6 +4,7 @@ import * as path from "path";
 import { logger } from "./logger";
 import { getChannelGame } from "./game-detector";
 import { processMessageForLearning, flushAccumulatorToDB } from "./bot-engine/pattern-learner";
+import { appendToCorpus } from "./corpus-writer";
 
 export interface SessionMessage {
   user: string;
@@ -125,12 +126,17 @@ export function startSessionRecording(
       if (match) {
         const [, user, text] = match;
 
+        const ts = new Date().toISOString();
+
         // Непрерывное обучение: обрабатываем каждое сообщение немедленно
         processMessageForLearning(channel, user, text);
 
+        // Append-only запись в корпус (JSONL) — каждое сырое сообщение без фильтров
+        appendToCorpus({ channel, user, text, ts });
+
         // Фильтруем боты и команды для хранения в сессии
         if (!text.startsWith("!") && !(/https?:\/\//.test(text)) && text.length >= 2 && text.length <= 300) {
-          session.messages.push({ user, text, timestamp: new Date().toISOString() });
+          session.messages.push({ user, text, timestamp: ts });
           session.message_count++;
 
           // Каждые 100 сообщений — flush аккумулятора в БД
