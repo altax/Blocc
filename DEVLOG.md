@@ -18,6 +18,19 @@
 
 ## Лог разработки
 
+### [2026-06-01] — Миграция на Replit: дашборд запущен ✅
+**Что сделано:**
+- [x] `pnpm install` — все зависимости установлены в pnpm-монорепо
+- [x] PostgreSQL provisioned, `pnpm --filter @workspace/db run push` — схема применена
+- [x] Оба воркфлоу запущены: API Server (порт 8080) и Dashboard (порт 23183)
+- [x] `.npmrc` — добавлен `public-hoist-pattern` для `react`, `react-dom`, `@tanstack/*`: hoisting обеспечивает единый инстанс для всех workspace-пакетов
+- [x] `vite.config.ts` — добавлен `server.proxy` `/api → http://localhost:8080`: без прокси запросы уходили на Vite (порт 23183), тот возвращал HTML-fallback, `customFetch` парсил его как строку → `data = "<html>..."` → краш `data?.map is not a function`
+- [x] `vite.config.ts` — добавлен `optimizeDeps.include` с синтаксисом `"@workspace/api-client-react > @tanstack/react-query"`: linked workspace пакеты не pre-bundle в Vite, без этого возникали два инстанса react-query → "Invalid hook call"
+
+**Результат:** дашборд загружается, все API-запросы проксируются корректно, ошибок нет.
+
+---
+
 ### [2026-06-01] — Авто-запись сессий при выходе стримера онлайн ✅
 **Что сделано:**
 - [x] `auto-scheduler.ts` — добавлен отдельный GQL-поллер (каждые 15 мин, не блокирует основной 3ч-цикл). При старте сервера через 10 сек сразу проверяет кто онлайн.

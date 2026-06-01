@@ -1,0 +1,1 @@
+- [Vite workspace react-query + API proxy](vite-workspace-react-query-prebundle.md) — two bugs: (1) missing vite proxy /api→8080 causes HTML parsed as data; (2) linked workspace pkg deps skip pre-bundler, fix via optimizeDeps.include "pkg > dep" + pnpm public-hoist-pattern

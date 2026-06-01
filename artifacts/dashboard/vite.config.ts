@@ -53,6 +53,13 @@ export default defineConfig({
     },
     dedupe: ["react", "react-dom", "@tanstack/react-query"],
   },
+  optimizeDeps: {
+    include: [
+      "@tanstack/react-query",
+      "@workspace/api-client-react > @tanstack/react-query",
+    ],
+    force: true,
+  },
   root: path.resolve(import.meta.dirname),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
@@ -63,6 +70,12 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    proxy: {
+      "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+      },
+    },
     fs: {
       strict: true,
     },
