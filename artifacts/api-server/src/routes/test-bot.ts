@@ -1,7 +1,7 @@
 /**
  * POST /api/bot/test-message
  * Генерирует сообщение бота на основе фейкового контекста.
- * Используется для проверки поведения ИИ без реального стрима.
+ * Поддерживает OpenAI GPT-4o-mini и Google Gemini 2.0 Flash (бесплатно).
  *
  * GET /api/bot/test-scenarios
  * Возвращает готовые сценарии для быстрого тестирования.
@@ -9,6 +9,7 @@
 
 import { Router, type IRouter } from "express";
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db, chatPatternsTable, botSettingsTable } from "@workspace/db";
 import { desc } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -82,17 +83,20 @@ router.post("/bot/test-message", async (req, res): Promise<void> => {
     map = "",
     situation = "",
     custom_context = "",
-    count = 3, // сколько вариантов генерировать
+    count = 3,
   } = req.body ?? {};
 
   try {
     const settings = await loadApiSettings();
-    if (!settings?.openaiApiKey) {
-      res.status(400).json({ error: "OpenAI API key not set. Configure in Settings." });
+    const hasOpenAI = !!settings?.openaiApiKey;
+    const hasGemini = !!settings?.geminiApiKey;
+
+    if (!hasOpenAI && !hasGemini) {
+      res.status(400).json({
+        error: "Нет API ключа. Добавь OpenAI или Gemini ключ в Settings. Gemini — бесплатно на aistudio.google.com",
+      });
       return;
     }
-
-    const client = new OpenAI({ apiKey: settings.openaiApiKey });
 
     // Загружаем топ-30 паттернов из обучения
     const patternRows = await db
@@ -106,7 +110,7 @@ router.post("/bot/test-message", async (req, res): Promise<void> => {
       ? `\nПРИМЕРЫ реального стиля из CS2 чата (ТОЛЬКО для понимания лексики и тона, НЕ копировать):\n${ruPatterns.map((p) => `- "${p.content}"`).join("\n")}`
       : "";
 
-    const systemPrompt = `${settings.personality || "Ты русский зритель CS2 стримов."}
+    const systemPrompt = `${settings?.personality || "Ты русский зритель CS2 стримов."}
 
 ЗАДАЧА: Написать сообщение в Twitch чат КАК ЖИВОЙ ЗРИТЕЛЬ, который ВИДИТ что происходит на стриме.
 
@@ -130,19 +134,38 @@ router.post("/bot/test-message", async (req, res): Promise<void> => {
 
     const userPrompt = `${contextParts.join("\n")}\n\nНапиши ${count === 1 ? "одно" : `${count} разных`} коротких ${count === 1 ? "сообщение" : "сообщения"} как живой русский зритель CS2:`;
 
-    const response = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      max_tokens: count * 25,
-      temperature: 0.95,
-      presence_penalty: 0.5,
-      frequency_penalty: 0.6,
-    });
+    let raw = "";
+    let tokensUsed = 0;
+    let modelUsed = "";
 
-    const raw = response.choices[0]?.message?.content?.trim() ?? "";
+    if (hasOpenAI) {
+      // OpenAI GPT-4o-mini
+      const client = new OpenAI({ apiKey: settings!.openaiApiKey! });
+      const response = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: count * 25,
+        temperature: 0.95,
+        presence_penalty: 0.5,
+        frequency_penalty: 0.6,
+      });
+      raw = response.choices[0]?.message?.content?.trim() ?? "";
+      tokensUsed = response.usage?.total_tokens ?? 0;
+      modelUsed = "gpt-4o-mini";
+    } else {
+      // Google Gemini 2.0 Flash (бесплатно)
+      const genAI = new GoogleGenerativeAI(settings!.geminiApiKey!);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const response = await model.generateContent(
+        `${systemPrompt}\n\n${userPrompt}`
+      );
+      raw = response.response.text().trim();
+      tokensUsed = response.response.usageMetadata?.totalTokenCount ?? 0;
+      modelUsed = "gemini-2.0-flash";
+    }
 
     // Разбиваем на отдельные варианты
     const variants = raw
@@ -151,13 +174,14 @@ router.post("/bot/test-message", async (req, res): Promise<void> => {
       .filter((l) => l.length > 0)
       .slice(0, count);
 
-    logger.info({ game_event: game_event.slice(0, 50), variants }, "Test message generated");
+    logger.info({ game_event: game_event.slice(0, 50), variants, modelUsed }, "Test message generated");
 
     res.json({
       variants,
       patterns_used: ruPatterns.slice(0, 5).map((p) => p.content),
       context: { game_event, streamer_speech, map, situation },
-      tokens_used: response.usage?.total_tokens ?? 0,
+      tokens_used: tokensUsed,
+      model_used: modelUsed,
     });
   } catch (err) {
     logger.error({ err }, "Test message generation failed");

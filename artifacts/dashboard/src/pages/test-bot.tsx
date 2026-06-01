@@ -20,6 +20,7 @@ interface TestResult {
   patterns_used: string[];
   context: { game_event: string; streamer_speech: string; map: string; situation: string };
   tokens_used: number;
+  model_used?: string;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -300,8 +301,18 @@ export default function TestBot() {
                   <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Что напишет бот
                   </div>
-                  <div className="text-[10px] text-muted-foreground">
-                    {lastResult.tokens_used} токенов
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    {lastResult.model_used && (
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded font-mono border",
+                        lastResult.model_used.includes("gemini")
+                          ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                          : "bg-green-500/10 border-green-500/30 text-green-400"
+                      )}>
+                        {lastResult.model_used}
+                      </span>
+                    )}
+                    <span>{lastResult.tokens_used} токенов</span>
                   </div>
                 </div>
                 <div className="space-y-2">

@@ -18,6 +18,13 @@
 
 ## Лог разработки
 
+### 2026-06-01 — Gemini 2.0 Flash как бесплатная альтернатива OpenAI
+- `response-generator.ts` — `generateChatMessage()` и `shouldRespond()` теперь принимают `geminiApiKey?` и используют Gemini если нет OpenAI ключа
+- `orchestrator.ts` — передаёт `settings.geminiApiKey` в обе функции; `startBot()` больше не требует OpenAI — достаточно любого из двух ключей
+- `routes/test-bot.ts` — аналогичная логика: OpenAI приоритет, Gemini fallback; возвращает поле `model_used`
+- `test-bot.tsx` — в шапке результатов показывает бейдж модели (`gpt-4o-mini` зелёный / `gemini-2.0-flash` синий) + количество токенов
+- Gemini free tier: 1500 req/day, без карты, ключ на aistudio.google.com
+
 ### [2026-06-01] — GQL multi-alias, улучшенный классификатор, Тест ИИ, редизайн Обучения ✅
 **Что сделано:**
 

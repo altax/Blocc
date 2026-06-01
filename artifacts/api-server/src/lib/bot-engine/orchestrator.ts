@@ -49,7 +49,7 @@ async function runDecisionLoop(): Promise<void> {
     const contextStr = buildContextString(patterns);
 
     const cooldownActive = now - lastMessageAt < cooldownMs;
-    const should = await shouldRespond(settings.openaiApiKey, contextStr, cooldownActive);
+    const should = await shouldRespond(settings.openaiApiKey, contextStr, cooldownActive, settings.geminiApiKey);
 
     await log("decision", should ? "Decided to send a message" : "Decided to stay silent", contextStr.slice(0, 500));
 
@@ -62,7 +62,8 @@ async function runDecisionLoop(): Promise<void> {
       settings.openaiApiKey,
       settings.personality,
       contextStr,
-      triggerType
+      triggerType,
+      settings.geminiApiKey
     );
 
     if (!message) return;
@@ -101,7 +102,9 @@ export async function startBot(): Promise<void> {
   const settings = await getSettings();
   if (!settings) throw new Error("No settings configured");
   if (!settings.channelName) throw new Error("Channel name not set");
-  if (!settings.openaiApiKey) throw new Error("OpenAI API key not set");
+  if (!settings.openaiApiKey && !settings.geminiApiKey) {
+    throw new Error("Нужен API ключ: добавь OpenAI или Gemini ключ в Settings");
+  }
 
   setBotRunning(true, settings.channelName);
   await log("decision", `Bot started for channel: ${settings.channelName}`);
