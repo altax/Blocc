@@ -18,6 +18,29 @@
 
 ## Лог разработки
 
+### 2026-06-01 — Переработка проверки онлайна стримеров: Helix API + GQL fallback ✅
+
+**Проблема:** Анонимный Twitch GQL с публичным `kimne78kx3ncx6brgo4mv6wki5h1ko` ненадёжен — возвращает `stream: null` для онлайн-стримеров (stale кэш, rate limits). Из-за этого часть онлайн-каналов отображалась как offline.
+
+**Что сделано:**
+- `lib/game-detector.ts` — полная переработка: теперь поддерживает два пути:
+  1. **Helix API** (надёжный) — `GET /helix/streams?user_login=...`, до 100 каналов в запросе, требует `clientId` + `oauthToken`
+  2. **GQL fallback** — array-запрос (один объект на канал), вместо alias-батчинга; используется только если нет credentials
+- Функция `batchCheckGames()` теперь принимает опциональный аргумент `credentials?: TwitchCredentials`
+- `lib/db/src/schema/settings.ts` — добавлено поле `twitchClientId text NOT NULL DEFAULT ''`
+- `lib/api-spec/openapi.yaml` — добавлено `twitch_client_id` в `BotSettings` и `BotSettingsUpdate`
+- `routes/settings.ts` — сериализация и обработка нового поля
+- `routes/streamers.ts` — `/check-online` читает credentials из БД и передаёт в `batchCheckGames()`
+- `lib/auto-scheduler.ts` — recording poller тоже читает credentials и передаёт в `batchCheckGames()`
+- `dashboard/pages/settings.tsx` — новые поля `Twitch Client ID` и `Twitch OAuth Token` рядом в блоке API ключей
+- `lib/api-spec/orval.config.ts` — убран баг codegen: post-fix скрипт удаляет дублирующий `export * from './generated/types'` из index.ts
+
+**Как использовать:** Зайти в Settings → API ключи → ввести Twitch Client ID (из dev.twitch.tv/console) и OAuth Token. После сохранения проверка онлайна автоматически переключится на официальный Helix API.
+
+**Без credentials:** система продолжает работать через GQL fallback (менее точный, но без дополнительной настройки).
+
+---
+
 ### 2026-06-01 — Gemini 2.0 Flash как бесплатная альтернатива OpenAI
 - `response-generator.ts` — `generateChatMessage()` и `shouldRespond()` теперь принимают `geminiApiKey?` и используют Gemini если нет OpenAI ключа
 - `orchestrator.ts` — передаёт `settings.geminiApiKey` в обе функции; `startBot()` больше не требует OpenAI — достаточно любого из двух ключей

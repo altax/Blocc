@@ -1,11 +1,20 @@
 import { Router, type IRouter } from "express";
 import { listStreamers, loadAnalysis, loadPatterns, loadRawSamples } from "../lib/streamer-analyzer";
 import { detectLiveChannels } from "../lib/live-detector";
-import { batchCheckGames } from "../lib/game-detector";
+import { batchCheckGames, type TwitchCredentials } from "../lib/game-detector";
 import { collectPatternsFromChannel } from "../lib/bot-engine/pattern-learner";
 import { RU_CS2_STREAMERS, getPresetChannels } from "../lib/cs2-ru-streamers";
+import { db } from "@workspace/db";
+import { botSettingsTable } from "@workspace/db";
 
 const router: IRouter = Router();
+
+async function getTwitchCredentials(): Promise<TwitchCredentials | undefined> {
+  const rows = await db.select().from(botSettingsTable).limit(1);
+  const s = rows[0];
+  if (!s?.twitchClientId || !s?.twitchOauthToken) return undefined;
+  return { clientId: s.twitchClientId, oauthToken: s.twitchOauthToken };
+}
 
 // Список всех стримеров с файлами
 router.get("/streamers", async (req, res): Promise<void> => {
@@ -27,11 +36,12 @@ router.get("/streamers/presets", async (req, res): Promise<void> => {
   res.json(RU_CS2_STREAMERS);
 });
 
-// Быстрая проверка онлайна через GQL — ~2 секунды (без IRC)
+// Быстрая проверка онлайна — Helix API если есть credentials, иначе GQL fallback
 router.post("/streamers/check-online", async (req, res): Promise<void> => {
   const channels: string[] = req.body?.channels ?? getPresetChannels(3);
   try {
-    const gameMap = await batchCheckGames(channels);
+    const credentials = await getTwitchCredentials();
+    const gameMap = await batchCheckGames(channels, credentials);
     const results = channels.map((channel) => {
       const info = gameMap.get(channel);
       return {

@@ -650,6 +650,8 @@ components:
           type: string
         twitch_oauth_token:
           type: string
+        twitch_client_id:
+          type: string
         openai_api_key:
           type: string
         gemini_api_key:
@@ -685,6 +687,8 @@ components:
         bot_username:
           type: string
         twitch_oauth_token:
+          type: string
+        twitch_client_id:
           type: string
         openai_api_key:
           type: string

@@ -24,6 +24,7 @@ export interface BotSettings {
   channel_name: string;
   bot_username: string;
   twitch_oauth_token?: string;
+  twitch_client_id?: string;
   openai_api_key?: string;
   gemini_api_key?: string;
   personality: string;
@@ -45,6 +46,7 @@ export interface BotSettingsUpdate {
   channel_name?: string;
   bot_username?: string;
   twitch_oauth_token?: string;
+  twitch_client_id?: string;
   openai_api_key?: string;
   gemini_api_key?: string;
   personality?: string;

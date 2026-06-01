@@ -1,13 +1,26 @@
 import { detectLiveChannels, type ChannelActivity } from "./live-detector";
 import { collectPatternsFromChannel } from "./bot-engine/pattern-learner";
 import { getPresetChannels } from "./cs2-ru-streamers";
-import { batchCheckGames, isCS2Game } from "./game-detector";
+import { batchCheckGames, isCS2Game, type TwitchCredentials } from "./game-detector";
 import {
   startSessionRecording,
   getActiveSession,
   registerStop,
 } from "./session-recorder";
 import { logger } from "./logger";
+import { db } from "@workspace/db";
+import { botSettingsTable } from "@workspace/db";
+
+async function getTwitchCredentials(): Promise<TwitchCredentials | undefined> {
+  try {
+    const rows = await db.select().from(botSettingsTable).limit(1);
+    const s = rows[0];
+    if (!s?.twitchClientId || !s?.twitchOauthToken) return undefined;
+    return { clientId: s.twitchClientId, oauthToken: s.twitchOauthToken };
+  } catch {
+    return undefined;
+  }
+}
 
 export interface SchedulerOptions {
   checkIntervalMs?: number;
@@ -180,13 +193,15 @@ class AutoScheduler {
     this.lastRecordingCheckAt = new Date();
     const channels = getPresetChannels(3);
 
-    logger.info({ channels }, "Recording poller: checking GQL for live CS2 channels");
+    const credentials = await getTwitchCredentials();
+    const method = credentials ? "helix" : "gql-fallback";
+    logger.info({ channels, method }, "Recording poller: checking live CS2 channels");
 
     let gameMap: Map<string, { game_name: string | null; is_live: boolean }>;
     try {
-      gameMap = await batchCheckGames(channels);
+      gameMap = await batchCheckGames(channels, credentials);
     } catch (err) {
-      logger.error({ err }, "Recording poller: GQL check failed");
+      logger.error({ err }, "Recording poller: stream check failed");
       return;
     }
 

@@ -31,6 +31,7 @@ const settingsSchema = z.object({
   channel_name: z.string().min(1, "Укажи имя канала"),
   bot_username: z.string().min(1, "Укажи никнейм бота"),
   twitch_oauth_token: z.string().default(""),
+  twitch_client_id: z.string().default(""),
   openai_api_key: z.string().default(""),
   gemini_api_key: z.string().default(""),
   personality: z.string().min(10, "Минимум 10 символов"),
@@ -72,6 +73,7 @@ export default function Settings() {
       channel_name: "",
       bot_username: "",
       twitch_oauth_token: "",
+      twitch_client_id: "",
       openai_api_key: "",
       gemini_api_key: "",
       personality: DEFAULT_PERSONALITY,
@@ -90,6 +92,7 @@ export default function Settings() {
         channel_name: settings.channel_name ?? "",
         bot_username: settings.bot_username ?? "",
         twitch_oauth_token: (settings as any).twitch_oauth_token ?? "",
+        twitch_client_id: (settings as any).twitch_client_id ?? "",
         openai_api_key: (settings as any).openai_api_key ?? "",
         gemini_api_key: (settings as any).gemini_api_key ?? "",
         personality: settings.personality || DEFAULT_PERSONALITY,
@@ -233,28 +236,50 @@ export default function Settings() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="twitch_oauth_token"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Twitch OAuth Token</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        className="bg-black/20 font-mono"
-                        placeholder="oauth:..."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Токен аккаунта с правом <code className="text-xs bg-black/30 px-1 rounded">chat:write</code>.
-                      Получить: <span className="text-primary">twitchapps.com/tmi</span>
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="twitch_client_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Twitch Client ID</FormLabel>
+                      <FormControl>
+                        <Input
+                          className="bg-black/20 font-mono"
+                          placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Из <span className="text-primary">dev.twitch.tv/console</span>. Нужен для точной проверки онлайна через Helix API.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="twitch_oauth_token"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Twitch OAuth Token</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          className="bg-black/20 font-mono"
+                          placeholder="oauth:..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Токен с правом <code className="text-xs bg-black/30 px-1 rounded">chat:write</code>.
+                        Получить: <span className="text-primary">twitchapps.com/tmi</span>
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </CardContent>
           </Card>
 

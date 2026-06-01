@@ -7,6 +7,7 @@ export const botSettingsTable = pgTable("bot_settings", {
   channelName: text("channel_name").notNull().default(""),
   botUsername: text("bot_username").notNull().default(""),
   twitchOauthToken: text("twitch_oauth_token").notNull().default(""),
+  twitchClientId: text("twitch_client_id").notNull().default(""),
   openaiApiKey: text("openai_api_key").notNull().default(""),
   geminiApiKey: text("gemini_api_key").notNull().default(""),
   personality: text("personality").notNull().default("You are a regular Twitch viewer. Write short, casual chat messages like a real person watching a stream. React naturally to what's happening. Be authentic, human, and occasionally use common Twitch slang. Never reveal you are an AI."),
