@@ -232,24 +232,28 @@ export default function TestBot() {
               )}
             </Button>
 
-            {testMutation.isError && (
-              <div className="flex items-start gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-lg p-3">
-                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                {testMutation.error?.message ?? "Неизвестная ошибка"}
-              </div>
-            )}
           </div>
         </div>
 
         {/* Right: Results */}
         <div className="flex-1 flex flex-col overflow-y-auto">
-          {!lastResult && !testMutation.isPending && (
+          {!lastResult && !testMutation.isPending && !testMutation.isError && (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
               <FlaskConical className="w-12 h-12 mb-4 opacity-20" />
               <div className="text-sm font-medium mb-1">Выбери сценарий или введи свой</div>
               <div className="text-xs leading-relaxed max-w-sm">
                 ИИ обучен на паттернах реального русского CS2 чата, но пишет
                 по конкретной ситуации — не копирует то что уже написали
+              </div>
+            </div>
+          )}
+
+          {!lastResult && !testMutation.isPending && testMutation.isError && (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+              <AlertCircle className="w-10 h-10 mb-3 text-destructive/60" />
+              <div className="text-sm font-medium text-destructive mb-1">Не удалось сгенерировать</div>
+              <div className="text-xs text-muted-foreground max-w-sm leading-relaxed">
+                {testMutation.error?.message ?? "Неизвестная ошибка"}
               </div>
             </div>
           )}

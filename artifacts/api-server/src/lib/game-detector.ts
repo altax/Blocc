@@ -34,9 +34,10 @@ export async function batchCheckGames(
   const logins = channels.map((ch) => ch.toLowerCase().replace(/[^a-z0-9_]/g, ""));
 
   // Строим единый запрос с алиасами ch0..chN
+  // type: "live" — обязательно для отличия реального стрима от VOD/повтора
   const aliases = logins.map(
     (login, i) =>
-      `ch${i}: user(login: "${login}") { stream { game { name } } }`
+      `ch${i}: user(login: "${login}") { stream { type game { name } } }`
   );
   const query = `{ ${aliases.join(" ")} }`;
 
@@ -58,7 +59,7 @@ export async function batchCheckGames(
     }
 
     const result = (await resp.json()) as {
-      data?: Record<string, { stream?: { game?: { name: string } | null } | null } | null>;
+      data?: Record<string, { stream?: { type?: string; game?: { name: string } | null } | null } | null>;
       errors?: unknown[];
     };
 
@@ -73,10 +74,14 @@ export async function batchCheckGames(
       const userData = result?.data?.[alias];
       const stream = userData?.stream;
 
-      if (!stream) {
+      // stream null/undefined = оффлайн
+      // stream.type !== "live" = VOD, re-run и т.д. — тоже считаем оффлайн
+      const isLive = !!stream && stream.type === "live";
+
+      if (!isLive) {
         map.set(ch, { game_name: null, is_live: false });
       } else {
-        const gameName = stream.game?.name ?? null;
+        const gameName = stream!.game?.name ?? null;
         map.set(ch, { game_name: gameName, is_live: true });
         liveCount++;
       }
