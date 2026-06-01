@@ -41,7 +41,10 @@ export function getRecentEvents(limit = 200): LearningEvent[] {
 }
 
 export function getEventsSince(id: string, limit = 200): LearningEvent[] {
-  const idx = ring.findLastIndex((e) => e.id === id);
+  let idx = -1;
+  for (let i = ring.length - 1; i >= 0; i--) {
+    if (ring[i]!.id === id) { idx = i; break; }
+  }
   if (idx === -1) return ring.slice(-limit);
   return ring.slice(idx + 1, idx + 1 + limit);
 }

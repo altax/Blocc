@@ -20,49 +20,103 @@ interface RawMessage {
 export function detectLanguage(text: string): "ru" | "en" | "mixed" {
   const cyrillicCount = (text.match(/[\u0400-\u04FF]/g) || []).length;
   const latinCount = (text.match(/[a-zA-Z]/g) || []).length;
-  if (cyrillicCount > 0 && latinCount > 0) return "mixed";
-  if (cyrillicCount > 0) return "ru";
-  return "en";
+  const totalAlpha = cyrillicCount + latinCount;
+  if (totalAlpha === 0) return "en"; // цифры/эмоуты — считаем en
+  const cyrillicRatio = cyrillicCount / totalAlpha;
+  if (cyrillicRatio >= 0.7) return "ru";
+  if (cyrillicRatio <= 0.3) return "en";
+  return "mixed";
 }
 
 export function detectGame(text: string): string {
   const t = text.toLowerCase();
-  if (/cs2|csgo|counter.?strike|флеш|флэш|смок|пуш|раш|ретейк|awp|ak-?47|rifle|pistol|ct|terrorist|inferno|mirage|dust|overpass|anubis|vertigo|5к|4к|3к|ace|клатч|clutch|eco|форс/i.test(t)) {
+  // CS2/CSGO терминология — расширенный список
+  if (/\b(cs2|csgo|counter.?strike)\b|флеш|флэш|смок|пуш|раш|ретейк|форс|eco|full.?buy|awp|deagle|ak.?47|m4a|rifle|pistol|нож(?:ичек)?|\bкт\b|\bкт-?\b|т-сайд|б-сайт|а-сайт|мидл|хед-?шот|хедшот|\bace\b|клатч|clutch|\b[345]к\b|inferno|mirage|dust|overpass|anubis|vertigo|nuke|ancient|cache|train|раш|бомба|плант|дефуз|тикай|расти|ротейт|холд|тактик|стратег|бай|форс.?бай|пистолетн|нагиб|экономь|сэкономь|феник|флагман/i.test(t)) {
     return "cs2";
   }
   return "other";
 }
 
+/**
+ * Классификатор типа сообщения. Порядок приоритетов:
+ * 1. cs2_callout    — тактические команды/ситуации в игре
+ * 2. cs2_reaction   — эмоциональная реакция на игровой момент (ОРУ, ВАУ, КРАСАВЧИК)
+ * 3. cs2_result     — результат раунда/матча (gg, ez, победа, проигрыш)
+ * 4. russian_slang  — общий русский сленг чата
+ * 5. hype           — энтузиазм/hype-фразы
+ * 6. joke / question / emote_combo / reaction
+ */
 export function classifyPattern(text: string): string {
-  const t = text.toLowerCase();
-  if (/пуш|флеш|флэш|смок|кидай|кидаем|тикай|ретейк|расти|ротейт|холд|форсим|форс|eco|full.?buy|хл|5к|4к|3к|ace|клатч|clutch|раш|ресет|кемп|боксить|пикать|пик|кт|т-сайд|б-сайт|а-сайт/i.test(t)) {
+  const t = text.toLowerCase().trim();
+
+  // ── 1. CS2 тактика/каллауты ─────────────────────────────────────────
+  if (/пуш|флеш(?:ани|уй)?|флэш|смок(?:ани)?|кидай|кидаем|тикай|ретейк|расти|ротейт(?:ируй)?|холд(?:уй)?|форсим|форс.?бай?|full.?buy|хл|5к|4к|3к|\bace\b|клатч|clutch|раш(?:ануть)?|ресет|кемп|боксить|пикать|\bпик\b|\bкт\b|т-сайд|б-сайт|а-сайт|мидл|ушан|плант(?:уй)?|дефузь|бомбу|тактик|стратег|позиция|выход|эко|форсить/i.test(t)) {
     return "cs2_callout";
   }
-  if (/кекв|кек(?!\w)|лол(?!\w)|хаха|ахах|ору|орнул|орём|хд(?!\w)|кринж|краш(?!\w)|красавчик|красава|вп(?!\w)|нагиб|имба|клоун|боже|ну и|да ладно|топчик|топ(?!\w)|пг(?!\w)|пикча|фанфары|збс|зашквар|нормис|варп/i.test(t)) {
+
+  // ── 2. Реакция на игровой момент (крики/возгласы/эмоции) ────────────
+  if (/ору(?:ёт|ём|т)?\b|орнул|орать|ааа+|вау+|во+у+|о+й+|бля+д?|пиздец|еба+ть|е+б+а+|нере+ально|нереал|ну.{0,5}всё|нет нет нет|да.{0,5}да.{0,5}да|КРАСАВ|красавчик|красава|красавец|топчик|легенд|нагиб(?:атор)?|хладн|монстр|зверь|бог|господи|невероятн|ебаный рот|уди.{0,10}тельно|monkaS|pogchamp|pog\b|PogChamp|Clap|ЛЕЕТЫ|ЛЕЕЕЕТЫ|letyyyy|KEKW/i.test(t)) {
+    return "cs2_reaction";
+  }
+
+  // ── 3. Итог раунда/матча ─────────────────────────────────────────────
+  if (/\bgg\b|\bez\b|gg.?wp|gg.?ez|победа|выиграл|проиграл|слили|слив|gg guys|gg chat|ez game|easy|нам.{0,8}конец|всё.{0,8}слил|карусель|разнесли|смяли|уничтожили|разгромили|ваншот|одним|одной|с хп|с хипи/i.test(t)) {
+    return "cs2_result";
+  }
+
+  // ── 4. Русский сленг чата ────────────────────────────────────────────
+  if (/кекв|кек(?:н|ов)?\b|лол\b|хаха|ахах|хех|хихи|хд\b|кринж|краш\b|вп\b|имба|клоун|боже.{0,5}мой|ну и|да ладно|топ\b|пг\b|пикча|фанфары|збс|зашквар|нормис|варп|ну.{0,5}всё|капец|капиталки|ахах|неа\b|оппа|олдовый|кринго|душно|душнота|мимо|мем|мемас|это.{0,5}норм|збс|жиза|жиз|зашло|незашло|лахта|стрёмно|ноу.{0,5}клатч|ноу.{0,5}флеш|смешно|смеш|ну сложн/i.test(t)) {
     return "russian_slang";
   }
-  if (/pog|pogchamp|letsgo|lets.?go|clap|omegalul|peepo|widepeepo|chatting|siuuu|gg(?!\w)|ez(?!\w)|пог/i.test(t)) {
+
+  // ── 5. Хайп/эмоуты ──────────────────────────────────────────────────
+  if (/\bpog\b|pogchamp|lets.?go|letsgo|\bclap\b|omegalul|peepo|widepeepo|\bgg\b|ez(?:pz)?\b|siuu+|пог\b|HYPERCLAP|LULW|OMEGALUL|KEKW|peepoArrive|peepoLeave|NODDERS|feelsGoodMan|feelsBadMan|monkaGIGA|monkaMEGA/i.test(t)) {
     return "hype";
   }
-  if (/lul(?!\w)|lmao|lol(?!\w)|kekw|4head|omegalul|haha|xd(?!\w)/i.test(t)) {
+
+  // ── 6. Шутка/ирония ──────────────────────────────────────────────────
+  if (/lul\b|lmao|lol\b|kekw|4head|haha|xd\b|LOL|LUL|KEKW|OMEGALUL|это лол|это хд|😂|🤣|💀/i.test(t)) {
     return "joke";
   }
-  if (text.includes("?")) return "question";
-  if (text.split(" ").length <= 3 && (/[A-Z]{3,}/.test(text) || /[А-ЯЁ]{2,}/.test(text))) {
+
+  // ── 7. Вопрос ────────────────────────────────────────────────────────
+  if (text.includes("?") || /почем|зачем|откуда|когда|почему|как так|что случил|что было|куда|где.{0,10}купил|что за|это что|а что/i.test(t)) {
+    return "question";
+  }
+
+  // ── 8. Эмоут-комбо (короткое и капс) ────────────────────────────────
+  if (text.split(/\s+/).length <= 3 && (/[A-Z]{3,}/.test(text) || /[А-ЯЁ]{3,}/.test(text))) {
     return "emote_combo";
   }
-  if (/точно|именно|конечно|факт|правда|согласен|да(?!\w)|нет(?!\w)|ладно|react|same|agreed|fr(?!\w)|ngl|imo/i.test(t)) {
+
+  // ── 9. Согласие/несогласие ───────────────────────────────────────────
+  if (/точно|именно|конечно|факт|правда|согласен|\+1\b|да\b|нет\b|ладно|react|same|agreed|\bfr\b|ngl|imo|это так|100%|сотка/i.test(t)) {
     return "reaction";
   }
+
   return "game_specific";
 }
 
+/**
+ * Фильтр: возвращает true если сообщение похоже на живого человека.
+ * Отсеивает: команды ботов, URL-ы, повторяющиеся символы, системные сообщения.
+ */
 function isHumanLike(text: string): boolean {
   if (text.length < 2 || text.length > 150) return false;
-  if (/^!/.test(text)) return false;
-  if (/https?:\/\//.test(text)) return false;
+  // Команды ботов
+  if (/^[!?$@]/.test(text)) return false;
+  // URL-ы
+  if (/https?:\/\/|www\.|\.com|\.ru|\.gg\//.test(text)) return false;
+  // Имена известных ботов
+  if (/nightbot|streamelements|moobot|fossabot|sery_bot|wizebot|botrix|stay_hydrated/i.test(text)) return false;
+  // Слово "bot" отдельно
   if (/\bbot\b/i.test(text)) return false;
-  if (/nightbot|streamelements|moobot|fossabot/i.test(text)) return false;
+  // Спам повторяющихся символов (более 5 подряд одинаковых)
+  if (/(.)\1{5,}/.test(text)) return false;
+  // Чисто эмодзи-спам (5+ эмодзи подряд)
+  if (/(\p{Emoji}){5,}/u.test(text)) return false;
+  // Подозрительно похоже на автоматическое сообщение
+  if (/\bfollowed\b|\bsubscribed\b|\braided\b|\bhosted\b|\bgifted\b/i.test(text)) return false;
   return true;
 }
 

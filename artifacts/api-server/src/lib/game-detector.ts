@@ -1,104 +1,12 @@
 import { logger } from "./logger";
 
-// Публичный Client-ID Twitch веб-клиента — работает без регистрации приложения
 const TWITCH_CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko";
 
-interface StreamInfo {
+export interface StreamInfo {
   game_name: string | null;
   is_live: boolean;
 }
 
-const GQL_STREAM_QUERY = `
-  query StreamInfo($login: String!) {
-    user(login: $login) {
-      stream {
-        game {
-          name
-        }
-      }
-    }
-  }
-`;
-
-/**
- * Проверяет список каналов одним батчевым GQL-запросом.
- * Twitch GQL поддерживает массив запросов в теле — это предотвращает rate-limit.
- * Возвращает Map channel → StreamInfo.
- */
-export async function batchCheckGames(
-  channels: string[]
-): Promise<Map<string, StreamInfo>> {
-  const map = new Map<string, StreamInfo>();
-  if (channels.length === 0) return map;
-
-  // Строим один батчевый запрос для всех каналов сразу
-  const payload = channels.map((ch) => ({
-    query: GQL_STREAM_QUERY,
-    variables: { login: ch.toLowerCase() },
-  }));
-
-  try {
-    const resp = await fetch("https://gql.twitch.tv/gql", {
-      method: "POST",
-      headers: {
-        "Client-ID": TWITCH_CLIENT_ID,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(12_000),
-    });
-
-    if (!resp.ok) {
-      logger.warn({ status: resp.status, channels }, "Twitch GQL batch non-OK");
-      // Fallback: возвращаем всех как offline
-      for (const ch of channels) map.set(ch, { game_name: null, is_live: false });
-      return map;
-    }
-
-    // Twitch возвращает массив результатов в том же порядке что и запросы
-    const results = (await resp.json()) as Array<{
-      data?: { user?: { stream?: { game?: { name: string } | null } | null } | null };
-    }>;
-
-    for (let i = 0; i < channels.length; i++) {
-      const ch = channels[i];
-      const result = results[i];
-      const stream = result?.data?.user?.stream;
-      if (!stream) {
-        map.set(ch, { game_name: null, is_live: false });
-      } else {
-        map.set(ch, { game_name: stream.game?.name ?? null, is_live: true });
-      }
-    }
-
-    logger.info(
-      {
-        total: channels.length,
-        live: [...map.values()].filter((v) => v.is_live).length,
-        channels: [...map.entries()]
-          .filter(([, v]) => v.is_live)
-          .map(([ch, v]) => `${ch}(${v.game_name ?? "?"})`)
-          .join(", "),
-      },
-      "GQL batch check complete"
-    );
-  } catch (err) {
-    logger.warn({ err, channels }, "GQL batch request failed, marking all offline");
-    for (const ch of channels) map.set(ch, { game_name: null, is_live: false });
-  }
-
-  return map;
-}
-
-/**
- * Проверяет один канал — используется для периодических проверок сессий.
- */
-export async function getChannelGame(channel: string): Promise<StreamInfo> {
-  const map = await batchCheckGames([channel]);
-  return map.get(channel) ?? { game_name: null, is_live: false };
-}
-
-/** Имена игры CS2 на Twitch */
 const CS2_GAME_NAMES = new Set([
   "Counter-Strike 2",
   "Counter-Strike: Global Offensive",
@@ -108,4 +16,92 @@ const CS2_GAME_NAMES = new Set([
 export function isCS2Game(game_name: string | null): boolean {
   if (!game_name) return false;
   return CS2_GAME_NAMES.has(game_name);
+}
+
+/**
+ * Единый multi-alias GQL запрос — надёжнее batch-array.
+ * Структура: { ch0: user(login:"x"){stream{...}}, ch1: ... }
+ * Ответ: { data: { ch0: {...}, ch1: {...} } }
+ * Не требует variables, не попадает под rate-limit batch-mode.
+ */
+export async function batchCheckGames(
+  channels: string[]
+): Promise<Map<string, StreamInfo>> {
+  const map = new Map<string, StreamInfo>();
+  if (channels.length === 0) return map;
+
+  // Нормализуем логины: Twitch lowercase, только a-z0-9_
+  const logins = channels.map((ch) => ch.toLowerCase().replace(/[^a-z0-9_]/g, ""));
+
+  // Строим единый запрос с алиасами ch0..chN
+  const aliases = logins.map(
+    (login, i) =>
+      `ch${i}: user(login: "${login}") { stream { game { name } } }`
+  );
+  const query = `{ ${aliases.join(" ")} }`;
+
+  try {
+    const resp = await fetch("https://gql.twitch.tv/gql", {
+      method: "POST",
+      headers: {
+        "Client-ID": TWITCH_CLIENT_ID,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!resp.ok) {
+      logger.warn({ status: resp.status }, "Twitch GQL multi-alias non-OK");
+      for (const ch of channels) map.set(ch, { game_name: null, is_live: false });
+      return map;
+    }
+
+    const result = (await resp.json()) as {
+      data?: Record<string, { stream?: { game?: { name: string } | null } | null } | null>;
+      errors?: unknown[];
+    };
+
+    if (result.errors) {
+      logger.warn({ errors: result.errors }, "Twitch GQL returned errors");
+    }
+
+    let liveCount = 0;
+    for (let i = 0; i < channels.length; i++) {
+      const ch = channels[i];
+      const alias = `ch${i}`;
+      const userData = result?.data?.[alias];
+      const stream = userData?.stream;
+
+      if (!stream) {
+        map.set(ch, { game_name: null, is_live: false });
+      } else {
+        const gameName = stream.game?.name ?? null;
+        map.set(ch, { game_name: gameName, is_live: true });
+        liveCount++;
+      }
+    }
+
+    logger.info(
+      {
+        total: channels.length,
+        live: liveCount,
+        online: channels
+          .filter((ch) => map.get(ch)?.is_live)
+          .map((ch) => `${ch}(${map.get(ch)?.game_name ?? "?"})`)
+          .join(", "),
+      },
+      "GQL multi-alias check complete"
+    );
+  } catch (err) {
+    logger.warn({ err }, "GQL multi-alias request failed — marking all offline");
+    for (const ch of channels) map.set(ch, { game_name: null, is_live: false });
+  }
+
+  return map;
+}
+
+export async function getChannelGame(channel: string): Promise<StreamInfo> {
+  const map = await batchCheckGames([channel]);
+  return map.get(channel) ?? { game_name: null, is_live: false };
 }

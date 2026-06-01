@@ -11,6 +11,7 @@ import schedulerRouter from "./scheduler";
 import sessionsRouter from "./sessions";
 import learningRouter from "./learning";
 import corpusRouter from "./corpus";
+import testBotRouter from "./test-bot";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(schedulerRouter);
 router.use(sessionsRouter);
 router.use(learningRouter);
 router.use(corpusRouter);
+router.use(testBotRouter);
 
 export default router;

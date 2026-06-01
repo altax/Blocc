@@ -12,6 +12,7 @@ import Patterns from "@/pages/patterns";
 import Settings from "@/pages/settings";
 import Streamers from "@/pages/streamers";
 import Learning from "@/pages/learning";
+import TestBot from "@/pages/test-bot";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ function Router() {
         <Route path="/messages" component={Messages} />
         <Route path="/streamers" component={Streamers} />
         <Route path="/learning" component={Learning} />
+        <Route path="/test-bot" component={TestBot} />
         <Route path="/patterns" component={Patterns} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
