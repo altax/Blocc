@@ -1,256 +1,286 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   useGetStreamerPresets,
   useCheckStreamersOnline,
-  useDetectLiveChannels,
   useCollectStreamerChat,
-  useListSessions,
   useGetActiveSessions,
   useStartSessionRecording,
   useStopSessionRecording,
   useGetSessionMessages,
   useGetSchedulerStatus,
   getGetActiveSessionsQueryKey,
-  getListSessionsQueryKey,
   getGetSessionMessagesQueryKey,
   getGetSchedulerStatusQueryKey,
   type OnlineCheckItem,
-  type SessionSummary,
   type SessionMessage,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   Radio, Download, Loader2, Zap, Square,
-  MessageSquare, Clock, Eye, ChevronDown, ChevronUp, Wifi, WifiOff,
-  CircleDot,
+  MessageSquare, RefreshCw, Wifi, WifiOff,
+  CircleDot, ChevronDown, ChevronUp, Activity,
+  Clock, Eye, Bot,
 } from "lucide-react";
 
 function formatAgo(iso: string | null | undefined): string {
   if (!iso) return "—";
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
-  if (s < 60) return `${s}с назад`;
+  if (s < 60) return `${s}с`;
   const m = Math.floor(diff / 60_000);
-  if (m < 60) return `${m}м назад`;
+  if (m < 60) return `${m}м`;
   const h = Math.floor(diff / 3_600_000);
-  return `${h}ч назад`;
+  return `${h}ч ${m % 60}м`;
 }
 
-function formatDuration(start: string, end: string | null | undefined): string {
-  const endTime = end ? new Date(end).getTime() : Date.now();
-  const diff = endTime - new Date(start).getTime();
+function formatDuration(start: string): string {
+  const diff = Date.now() - new Date(start).getTime();
   const m = Math.floor(diff / 60_000);
   const h = Math.floor(m / 60);
   if (h > 0) return `${h}ч ${m % 60}м`;
   return `${m}м`;
 }
 
-// ── Панель сообщений сессии ─────────────────────────────────────────────────
-function SessionMessageFeed({ channel, total }: { channel: string; total: number }) {
+// ── Живой чат канала ─────────────────────────────────────────────────────────
+function LiveChatFeed({ channel, compact = false }: { channel: string; compact?: boolean }) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const prevCount = useRef(0);
 
-  const { data } = useGetSessionMessages(channel, { limit: 200 }, {
+  const { data } = useGetSessionMessages(channel, { limit: 150 }, {
     query: {
-      queryKey: getGetSessionMessagesQueryKey(channel, { limit: 200 }),
-      refetchInterval: 3000,
-    }
+      queryKey: getGetSessionMessagesQueryKey(channel, { limit: 150 }),
+      refetchInterval: 2000,
+    },
   });
-
-  useEffect(() => {
-    if (autoScroll) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [data?.messages, autoScroll]);
 
   const messages = data?.messages ?? [];
 
-  return (
-    <div className="flex flex-col h-64">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/40 bg-muted/20">
-        <span className="text-xs text-muted-foreground">
-          {total} сообщений · показано {messages.length}
-        </span>
-        <button
-          onClick={() => setAutoScroll((v) => !v)}
-          className={cn("text-xs px-2 py-0.5 rounded", autoScroll ? "text-primary" : "text-muted-foreground")}
-        >
-          {autoScroll ? "▼ авто" : "▼ пауза"}
-        </button>
+  useEffect(() => {
+    if (autoScroll && messages.length !== prevCount.current) {
+      prevCount.current = messages.length;
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages.length, autoScroll]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+    setAutoScroll(atBottom);
+  };
+
+  if (messages.length === 0) {
+    return (
+      <div className={cn("flex items-center justify-center text-muted-foreground text-xs gap-2", compact ? "h-12" : "h-20")}>
+        <Loader2 className="w-3 h-3 animate-spin" />
+        Ожидаем сообщения...
       </div>
-      <div className="flex-1 overflow-y-auto font-mono text-xs p-2 space-y-0.5">
-        {messages.length === 0 && (
-          <div className="text-muted-foreground text-center py-8">Ждём сообщения...</div>
-        )}
+    );
+  }
+
+  return (
+    <div className={cn("relative", compact ? "h-32" : "h-52")}>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="h-full overflow-y-auto font-mono text-xs p-2 space-y-0.5 scroll-smooth"
+      >
         {messages.map((msg: SessionMessage, i: number) => (
-          <div key={i} className="flex gap-2 leading-5">
-            <span className="text-blue-400 shrink-0">{msg.user}:</span>
-            <span className="text-foreground/90 break-all">{msg.text}</span>
+          <div key={i} className="flex gap-1.5 leading-5 group">
+            <span className="text-blue-400/80 shrink-0 min-w-0 max-w-[90px] truncate">{msg.user}</span>
+            <span className="text-muted-foreground shrink-0">:</span>
+            <span className="text-foreground/80 break-all">{msg.text}</span>
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
+      {!autoScroll && (
+        <button
+          onClick={() => {
+            setAutoScroll(true);
+            bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+          }}
+          className="absolute bottom-2 right-2 bg-primary/20 hover:bg-primary/30 text-primary text-[10px] px-2 py-0.5 rounded-full border border-primary/30 transition-colors"
+        >
+          ↓ к концу
+        </button>
+      )}
     </div>
   );
 }
 
-// ── Карточка активной сессии ────────────────────────────────────────────────
-function ActiveSessionCard({
-  session,
-  presetMap,
-  onStop,
+// ── Карточка стримера ─────────────────────────────────────────────────────────
+function StreamerCard({
+  channel,
+  displayName,
+  description,
+  onlineInfo,
+  isCollecting,
+  activeSession,
+  onCollect,
+  onStartSession,
+  onStopSession,
 }: {
-  session: SessionSummary;
-  presetMap: Map<string, { displayName: string }>;
-  onStop: (channel: string) => void;
+  channel: string;
+  displayName: string;
+  description: string;
+  onlineInfo: OnlineCheckItem | null;
+  isCollecting: boolean;
+  activeSession: { message_count: number; started_at: string; game_name: string | null } | null;
+  onCollect: () => void;
+  onStartSession: () => void;
+  onStopSession: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const displayName = presetMap.get(session.channel)?.displayName ?? session.channel;
+  const [chatOpen, setChatOpen] = useState(false);
+  const isLive = onlineInfo?.is_live ?? false;
+  const isCS2 = onlineInfo?.is_cs2 ?? false;
+  const hasSession = !!activeSession;
+
+  // Авто-открыть чат если сессия активна
+  useEffect(() => {
+    if (hasSession) setChatOpen(true);
+  }, [hasSession]);
 
   return (
-    <Card className="border-green-500/30 bg-green-500/5">
+    <Card className={cn(
+      "border transition-all duration-300",
+      isCS2 ? "border-green-500/40 bg-green-500/5 shadow-green-500/5 shadow-lg" :
+      isLive ? "border-yellow-500/30 bg-yellow-500/5" :
+      "border-border/40 bg-card/30"
+    )}>
       <CardContent className="p-0">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0" />
-            <div>
-              <div className="font-medium text-sm flex items-center gap-2">
-                {displayName}
-                {session.game_name && (
-                  <Badge variant="outline" className="text-xs h-4 px-1.5 border-green-500/40 text-green-400">
-                    {session.game_name}
-                  </Badge>
-                )}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Запись {formatDuration(session.started_at, null)} ·{" "}
-                <span className="text-green-400 font-medium">{session.message_count} сообщ.</span>
-              </div>
+        {/* Шапка карточки */}
+        <div className="flex items-center gap-3 px-4 py-3">
+          {/* Статус индикатор */}
+          <div className="relative shrink-0">
+            <div className={cn(
+              "w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold",
+              isCS2 ? "bg-green-500/20 text-green-400" :
+              isLive ? "bg-yellow-500/20 text-yellow-400" :
+              "bg-muted/30 text-muted-foreground"
+            )}>
+              {displayName[0].toUpperCase()}
             </div>
+            <div className={cn(
+              "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
+              onlineInfo === null ? "bg-muted/40" :
+              isCS2 ? "bg-green-500 animate-pulse" :
+              isLive ? "bg-yellow-400" :
+              "bg-muted-foreground/30"
+            )} />
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm" variant="ghost"
-              className="h-7 w-7 p-0"
-              onClick={() => setExpanded((v) => !v)}
-            >
-              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </Button>
-            <Button
-              size="sm" variant="outline"
-              className="h-7 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
-              onClick={() => onStop(session.channel)}
-            >
-              <Square className="w-3 h-3 mr-1" /> Стоп
-            </Button>
+
+          {/* Имя и описание */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-semibold text-sm">{displayName}</span>
+              {isCS2 && (
+                <Badge className="text-[9px] h-4 px-1.5 bg-green-500/20 text-green-400 border-green-500/40 font-mono">
+                  CS2 ● LIVE
+                </Badge>
+              )}
+              {isLive && !isCS2 && onlineInfo?.game_name && (
+                <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-yellow-500/40 text-yellow-400">
+                  {onlineInfo.game_name.slice(0, 18)}
+                </Badge>
+              )}
+              {!isLive && onlineInfo !== null && (
+                <span className="text-[10px] text-muted-foreground/50 font-mono">offline</span>
+              )}
+              {onlineInfo === null && (
+                <span className="text-[10px] text-muted-foreground/30 font-mono">—</span>
+              )}
+            </div>
+            <div className="text-[11px] text-muted-foreground truncate">{description}</div>
+          </div>
+
+          {/* Метрики */}
+          <div className="shrink-0 text-right hidden sm:block">
+            {hasSession && (
+              <div className="text-xs">
+                <div className="text-green-400 font-mono font-medium">{activeSession!.message_count}</div>
+                <div className="text-[10px] text-muted-foreground">сообщ.</div>
+              </div>
+            )}
           </div>
         </div>
-        {expanded && (
-          <div className="border-t border-border/40">
-            <SessionMessageFeed channel={session.channel} total={session.message_count} />
+
+        {/* Кнопки действий */}
+        <div className="flex items-center gap-1.5 px-4 pb-3">
+          {/* Запись чата */}
+          {isLive && !hasSession && (
+            <Button
+              size="sm" variant="outline"
+              className="h-7 text-xs border-green-500/40 text-green-400 hover:bg-green-500/10 gap-1"
+              onClick={onStartSession}
+            >
+              <Radio className="w-3 h-3" /> Запись чата
+            </Button>
+          )}
+          {hasSession && (
+            <Button
+              size="sm" variant="outline"
+              className="h-7 text-xs border-red-500/40 text-red-400 hover:bg-red-500/10 gap-1"
+              onClick={onStopSession}
+            >
+              <Square className="w-3 h-3" /> Стоп
+            </Button>
+          )}
+
+          {/* Собрать паттерны */}
+          <Button
+            size="sm" variant="outline"
+            className="h-7 text-xs gap-1"
+            onClick={onCollect}
+            disabled={isCollecting}
+          >
+            {isCollecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+            {isCollecting ? "Сбор..." : "Паттерны"}
+          </Button>
+
+          {/* Развернуть чат */}
+          {hasSession && (
+            <button
+              onClick={() => setChatOpen((v) => !v)}
+              className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <MessageSquare className="w-3 h-3" />
+              {chatOpen ? "Свернуть" : "Чат"}
+              {chatOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          )}
+        </div>
+
+        {/* Активная сессия — статус + чат */}
+        {hasSession && (
+          <div className="border-t border-green-500/20">
+            <div className="flex items-center justify-between px-4 py-1.5 bg-green-500/5">
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+                <span className="text-green-400 font-medium">Запись {formatDuration(activeSession!.started_at)}</span>
+                {activeSession!.game_name && (
+                  <span className="text-muted-foreground">· {activeSession!.game_name}</span>
+                )}
+              </div>
+              <span className="text-[10px] text-muted-foreground font-mono">{activeSession!.message_count} сообщ.</span>
+            </div>
+            {chatOpen && (
+              <div className="border-t border-green-500/10 bg-black/20">
+                <LiveChatFeed channel={channel} compact />
+              </div>
+            )}
           </div>
         )}
       </CardContent>
     </Card>
-  );
-}
-
-// ── Строка стримера ─────────────────────────────────────────────────────────
-function StreamerRow({
-  channel,
-  displayName,
-  category,
-  description,
-  onlineInfo,
-  isCollecting,
-  hasSession,
-  onCollect,
-  onStartSession,
-}: {
-  channel: string;
-  displayName: string;
-  category: string;
-  description: string;
-  onlineInfo: OnlineCheckItem | null;
-  isCollecting: boolean;
-  hasSession: boolean;
-  onCollect: () => void;
-  onStartSession: () => void;
-}) {
-  const isLive = onlineInfo?.is_live ?? false;
-  const isCS2 = onlineInfo?.is_cs2 ?? false;
-
-  return (
-    <div className={cn(
-      "flex items-center justify-between px-4 py-3 rounded-lg border transition-all",
-      isCS2 ? "border-green-500/30 bg-green-500/5" :
-      isLive ? "border-yellow-500/20 bg-yellow-500/5" :
-      "border-border/30 bg-card/30"
-    )}>
-      <div className="flex items-center gap-3 min-w-0">
-        <div className={cn(
-          "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-          category === "entertainment" ? "bg-purple-500/20 text-purple-400" :
-          category === "variety" ? "bg-blue-500/20 text-blue-400" :
-          "bg-orange-500/20 text-orange-400"
-        )}>
-          {displayName[0].toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <div className="font-medium text-sm flex items-center gap-2 flex-wrap">
-            {displayName}
-            {isCS2 && (
-              <Badge variant="outline" className="text-xs h-4 px-1.5 border-green-500/40 text-green-400">CS2 ✓</Badge>
-            )}
-            {isLive && !isCS2 && onlineInfo?.game_name && (
-              <Badge variant="outline" className="text-xs h-4 px-1.5 border-yellow-500/40 text-yellow-400">
-                {onlineInfo.game_name.length > 16 ? onlineInfo.game_name.slice(0, 14) + "…" : onlineInfo.game_name}
-              </Badge>
-            )}
-            {hasSession && (
-              <Badge variant="outline" className="text-xs h-4 px-1.5 border-green-500/30 text-green-400 animate-pulse">
-                ● REC
-              </Badge>
-            )}
-          </div>
-          <div className="text-xs text-muted-foreground truncate">{description}</div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1.5 shrink-0 ml-2">
-        {/* Статус онлайна */}
-        {onlineInfo !== null && (
-          isLive
-            ? <Wifi className="w-3.5 h-3.5 text-green-400" />
-            : <WifiOff className="w-3.5 h-3.5 text-muted-foreground/40" />
-        )}
-
-        {/* Запись сессии */}
-        {isLive && !hasSession && (
-          <Button
-            size="sm" variant="outline"
-            className="h-7 text-xs border-green-500/40 text-green-400 hover:bg-green-500/10"
-            onClick={onStartSession}
-          >
-            <Radio className="w-3 h-3 mr-1" /> Запись
-          </Button>
-        )}
-
-        {/* Сбор паттернов */}
-        <Button
-          size="sm" variant="outline"
-          className="h-7 text-xs"
-          onClick={onCollect}
-          disabled={isCollecting}
-        >
-          {isCollecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
-          {isCollecting ? "..." : "Паттерны"}
-        </Button>
-      </div>
-    </div>
   );
 }
 
@@ -261,14 +291,12 @@ export default function Streamers() {
 
   const [onlineResults, setOnlineResults] = useState<Map<string, OnlineCheckItem>>(new Map());
   const [checking, setChecking] = useState(false);
-  const [detecting, setDetecting] = useState(false);
   const [collecting, setCollecting] = useState<Set<string>>(new Set());
-  const [selectedSession, setSelectedSession] = useState<string | null>(null);
-  const [savedExpanded, setSavedExpanded] = useState(false);
+  const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
+  const [selectedFeedChannel, setSelectedFeedChannel] = useState<string | null>(null);
 
   const { data: presets } = useGetStreamerPresets();
   const checkOnline = useCheckStreamersOnline();
-  const detectLive = useDetectLiveChannels();
   const collectChat = useCollectStreamerChat();
   const startSession = useStartSessionRecording();
   const stopSession = useStopSessionRecording();
@@ -276,109 +304,72 @@ export default function Streamers() {
   const { data: activeSessions, refetch: refetchActive } = useGetActiveSessions({
     query: {
       queryKey: getGetActiveSessionsQueryKey(),
-      refetchInterval: 5000,
-    }
-  });
-
-  const { data: savedSessions, refetch: refetchSaved } = useListSessions(undefined, {
-    query: {
-      queryKey: getListSessionsQueryKey(),
-      refetchInterval: 30000,
-    }
+      refetchInterval: 3000,
+    },
   });
 
   const { data: schedulerStatus } = useGetSchedulerStatus({
     query: {
       queryKey: getGetSchedulerStatusQueryKey(),
       refetchInterval: 15000,
-    }
+    },
   });
 
-  // Сессия для просмотра сообщений
-  const { data: sessionMsgs } = useGetSessionMessages(
-    selectedSession ?? "",
-    { limit: 500 },
-    {
-      query: {
-        enabled: !!selectedSession,
-        queryKey: getGetSessionMessagesQueryKey(selectedSession ?? "", { limit: 500 }),
-        refetchInterval: selectedSession ? 3000 : false,
-      }
-    }
-  );
-
-  const presetMap = new Map(presets?.map((p) => [p.channel, p]) ?? []);
   const activeSessionMap = new Map((activeSessions ?? []).map((s) => [s.channel, s]));
 
-  // ── Быстрая проверка GQL (~2с) ──────────────────────────────────────────
-  const handleCheckOnline = async () => {
+  // ── Проверка онлайна ───────────────────────────────────────────────────
+  const runCheck = useCallback(async (silent = false) => {
+    if (checking) return;
     setChecking(true);
     try {
       const result = await checkOnline.mutateAsync({ data: {} });
       const map = new Map<string, OnlineCheckItem>();
       for (const r of result.results) map.set(r.channel, r);
       setOnlineResults(map);
-      const liveCount = result.results.filter((r) => r.is_live).length;
-      const cs2Count = result.results.filter((r) => r.is_cs2).length;
-      toast({
-        title: `Онлайн: ${liveCount} стримеров`,
-        description: cs2Count > 0 ? `${cs2Count} играют в CS2` : "Никто не стримит CS2 прямо сейчас",
-      });
+      setLastCheckedAt(new Date());
+      if (!silent) {
+        const liveCount = result.results.filter((r) => r.is_live).length;
+        const cs2Count = result.results.filter((r) => r.is_cs2).length;
+        toast({
+          title: `Онлайн: ${liveCount} из ${result.results.length}`,
+          description: cs2Count > 0 ? `${cs2Count} стримят CS2` : "CS2 никто не стримит",
+        });
+      }
     } catch {
-      toast({ title: "Ошибка проверки", variant: "destructive" });
+      if (!silent) toast({ title: "Ошибка проверки", variant: "destructive" });
     } finally {
       setChecking(false);
     }
-  };
+  }, [checking, checkOnline, toast]);
 
-  // ── Глубокая проверка IRC + GQL (30с) ──────────────────────────────────
-  const handleDetectDeep = async () => {
-    setDetecting(true);
-    toast({ title: "Глубокий анализ...", description: "IRC 30 секунд по всем каналам" });
-    try {
-      const result = await detectLive.mutateAsync({ data: { window_ms: 30000 } });
-      const map = new Map<string, OnlineCheckItem>();
-      for (const r of result.results) {
-        map.set(r.channel, {
-          channel: r.channel,
-          is_live: r.is_live,
-          game_name: r.game_name ?? null,
-          is_cs2: r.is_cs2,
-        });
-      }
-      setOnlineResults(map);
-      toast({ title: "Анализ завершён", description: `Живые: ${result.results.filter((r) => r.is_live).map((r) => r.channel).join(", ") || "никого"}` });
-    } catch {
-      toast({ title: "Ошибка", variant: "destructive" });
-    } finally {
-      setDetecting(false);
-    }
-  };
+  // Авто-проверка при загрузке и каждые 60 секунд
+  useEffect(() => {
+    runCheck(true);
+    const interval = setInterval(() => runCheck(true), 60_000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Сбор паттернов ─────────────────────────────────────────────────────
   const handleCollect = async (channel: string) => {
     setCollecting((prev) => new Set([...prev, channel]));
-    toast({ title: `Собираю паттерны: ${channel}`, description: "500 сообщений, займёт 5–15 мин" });
     try {
       await collectChat.mutateAsync({ channel, data: { message_count: 500 } });
-      toast({ title: `${channel}: сбор запущен` });
+      toast({ title: `Паттерны: ${channel}`, description: "Сбор запущен (~500 сообщ., 5–15 мин)" });
     } catch {
       toast({ title: "Ошибка сбора", variant: "destructive" });
     } finally {
       setTimeout(() => {
         setCollecting((prev) => { const s = new Set(prev); s.delete(channel); return s; });
-      }, 5000);
+      }, 8000);
     }
   };
 
-  // ── Запуск записи сессии ───────────────────────────────────────────────
+  // ── Старт/стоп записи ──────────────────────────────────────────────────
   const handleStartSession = async (channel: string) => {
     try {
       await startSession.mutateAsync({ channel, data: {} });
-      toast({
-        title: `Запись начата: ${channel}`,
-        description: "Все сообщения пишутся в реальном времени. Автостоп при уходе офлайн.",
-      });
+      toast({ title: `Запись начата: ${channel}` });
       refetchActive();
       queryClient.invalidateQueries({ queryKey: getGetActiveSessionsQueryKey() });
     } catch {
@@ -386,287 +377,263 @@ export default function Streamers() {
     }
   };
 
-  // ── Стоп записи ────────────────────────────────────────────────────────
   const handleStopSession = async (channel: string) => {
     try {
       await stopSession.mutateAsync({ channel });
       toast({ title: `Запись остановлена: ${channel}` });
       refetchActive();
-      refetchSaved();
       queryClient.invalidateQueries({ queryKey: getGetActiveSessionsQueryKey() });
-      queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() });
     } catch {
       toast({ title: "Ошибка", variant: "destructive" });
     }
   };
 
   const channels = presets ?? [];
+  const liveChannels = channels.filter((p) => onlineResults.get(p.channel)?.is_live);
+  const cs2Channels = channels.filter((p) => onlineResults.get(p.channel)?.is_cs2);
+  const offlineChannels = channels.filter((p) => {
+    const info = onlineResults.get(p.channel);
+    return info !== undefined && !info.is_live;
+  });
+  const uncheckedChannels = channels.filter((p) => !onlineResults.has(p.channel));
+
+  const activeCount = activeSessions?.length ?? 0;
 
   return (
-    <div className="flex flex-col h-full overflow-auto">
-      <div className="px-8 py-5 border-b border-border/50">
-        <h1 className="text-xl font-semibold">Стримеры</h1>
-        <p className="text-muted-foreground text-sm mt-0.5">
-          Проверка онлайна · Запись чата в реальном времени · Сбор паттернов
-        </p>
-      </div>
-
-      <div className="flex-1 px-8 py-5 space-y-5">
-
-        {/* ── Панель проверки онлайна ─────────────────────────────────── */}
-        <Card className="border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Wifi className="w-4 h-4 text-green-400" />
-              Кто онлайн сейчас?
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={handleCheckOnline}
-                disabled={checking || detecting}
-                className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-              >
-                {checking
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Zap className="w-4 h-4" />}
-                {checking ? "Проверяю (~2с)..." : "Быстрая проверка GQL (~2с)"}
-              </Button>
-              <Button
-                onClick={handleDetectDeep}
-                disabled={checking || detecting}
-                variant="outline"
-                className="gap-2"
-              >
-                {detecting
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Radio className="w-4 h-4" />}
-                {detecting ? "IRC 30с..." : "Глубокий IRC анализ (30с)"}
-              </Button>
-            </div>
-
-            {onlineResults.size > 0 && (
-              <div className="text-xs text-muted-foreground">
-                Проверено {onlineResults.size} каналов ·{" "}
-                <span className="text-green-400">
-                  {[...onlineResults.values()].filter((r) => r.is_live).length} онлайн
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ── Авто-запись (планировщик) ───────────────────────────────── */}
-        <Card className={cn(
-          "border-border/50 transition-colors",
-          schedulerStatus?.auto_record_enabled && schedulerStatus.auto_recording_channels.length > 0
-            ? "border-green-500/30 bg-green-500/5"
-            : ""
-        )}>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CircleDot className={cn(
-                "w-4 h-4",
-                schedulerStatus?.auto_record_enabled
-                  ? "text-green-400 animate-pulse"
-                  : "text-muted-foreground"
-              )} />
-              Авто-запись при выходе онлайн
-              {schedulerStatus?.auto_record_enabled
-                ? <Badge variant="outline" className="text-xs border-green-500/40 text-green-400">Активна</Badge>
-                : <Badge variant="outline" className="text-xs text-muted-foreground">Выключена</Badge>
-              }
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {schedulerStatus ? (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-muted-foreground">Поллинг GQL</span>
-                    <span className="font-medium">каждые {schedulerStatus.recording_poll_interval_minutes}м</span>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-muted-foreground">Последняя проверка</span>
-                    <span className="font-medium">{formatAgo(schedulerStatus.last_recording_check_at)}</span>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-muted-foreground">Идёт запись</span>
-                    <span className="font-medium text-green-400">
-                      {schedulerStatus.auto_recording_channels.length > 0
-                        ? schedulerStatus.auto_recording_channels.join(", ")
-                        : "—"}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-xs text-muted-foreground">Статус планировщика</span>
-                    <span className={cn("font-medium", schedulerStatus.running ? "text-green-400" : "text-muted-foreground")}>
-                      {schedulerStatus.running ? "запущен" : "остановлен"}
-                    </span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Каждые {schedulerStatus.recording_poll_interval_minutes} минут система проверяет через Twitch API кто из CS2-стримеров вышел онлайн и автоматически начинает запись чата.
-                </p>
-              </>
-            ) : (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Загружаю статус планировщика...
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ── Список стримеров ────────────────────────────────────────── */}
-        <div className="space-y-2">
-          <div className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-1">
-            Все стримеры ({channels.length})
-          </div>
-          {channels.map((p) => (
-            <StreamerRow
-              key={p.channel}
-              channel={p.channel}
-              displayName={p.displayName}
-              category={p.category}
-              description={p.description}
-              onlineInfo={onlineResults.get(p.channel) ?? null}
-              isCollecting={collecting.has(p.channel)}
-              hasSession={activeSessionMap.has(p.channel)}
-              onCollect={() => handleCollect(p.channel)}
-              onStartSession={() => handleStartSession(p.channel)}
-            />
-          ))}
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Заголовок ─────────────────────────────────────────────────── */}
+      <div className="px-6 py-4 border-b border-border/50 flex items-center justify-between shrink-0">
+        <div>
+          <h1 className="text-lg font-semibold flex items-center gap-2">
+            <Eye className="w-5 h-5 text-primary" />
+            Стримеры
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Мониторинг · Запись чата · Сбор паттернов для обучения ИИ
+          </p>
         </div>
 
-        {/* ── Активные записи ─────────────────────────────────────────── */}
-        {(activeSessions?.length ?? 0) > 0 && (
-          <div className="space-y-2">
-            <div className="text-sm font-medium uppercase tracking-wider px-1 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Активные записи ({activeSessions!.length})
+        <div className="flex items-center gap-3">
+          {/* Статистика */}
+          {onlineResults.size > 0 && (
+            <div className="hidden sm:flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-green-400 font-medium">{cs2Channels.length} CS2</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                <span className="text-yellow-400">{liveChannels.length - cs2Channels.length} live</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                <span className="text-muted-foreground">{offlineChannels.length} offline</span>
+              </div>
             </div>
-            {activeSessions!.map((s) => (
-              <ActiveSessionCard
-                key={s.channel}
-                session={s}
-                presetMap={presetMap as Map<string, { displayName: string }>}
-                onStop={handleStopSession}
-              />
-            ))}
+          )}
+
+          {/* Кнопка обновления */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => runCheck(false)}
+            disabled={checking}
+            className="gap-1.5 h-8 text-xs"
+          >
+            {checking
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <RefreshCw className="w-3.5 h-3.5" />}
+            {checking ? "Проверяю..." : "Обновить"}
+          </Button>
+        </div>
+      </div>
+
+      {/* Статус последней проверки */}
+      {lastCheckedAt && (
+        <div className="px-6 py-1.5 bg-muted/20 border-b border-border/30 flex items-center gap-2 text-[11px] text-muted-foreground shrink-0">
+          <Clock className="w-3 h-3" />
+          <span>Последняя проверка: {formatAgo(lastCheckedAt.toISOString())} назад · автообновление каждые 60с</span>
+          {activeCount > 0 && (
+            <>
+              <span className="mx-1">·</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-green-400">{activeCount} активных записей</span>
+            </>
+          )}
+          {schedulerStatus?.auto_record_enabled && (
+            <>
+              <span className="mx-1">·</span>
+              <CircleDot className="w-3 h-3 text-green-400" />
+              <span className="text-green-400">Авто-запись включена</span>
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="flex-1 overflow-hidden flex">
+        {/* ── Основной список ────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 space-y-4">
+
+            {/* Активные записи — плашки вверху */}
+            {activeCount > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-green-400 uppercase tracking-wider px-1">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  Активные записи ({activeCount})
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {(activeSessions ?? []).map((s) => {
+                    const preset = channels.find((p) => p.channel === s.channel);
+                    return (
+                      <StreamerCard
+                        key={s.channel}
+                        channel={s.channel}
+                        displayName={preset?.displayName ?? s.channel}
+                        description={preset?.description ?? ""}
+                        onlineInfo={onlineResults.get(s.channel) ?? null}
+                        isCollecting={collecting.has(s.channel)}
+                        activeSession={s}
+                        onCollect={() => handleCollect(s.channel)}
+                        onStartSession={() => handleStartSession(s.channel)}
+                        onStopSession={() => handleStopSession(s.channel)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* CS2 онлайн */}
+            {cs2Channels.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-green-400/80 uppercase tracking-wider px-1">
+                  <Zap className="w-3 h-3" />
+                  CS2 онлайн ({cs2Channels.length})
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {cs2Channels
+                    .filter((p) => !activeSessionMap.has(p.channel))
+                    .map((p) => (
+                      <StreamerCard
+                        key={p.channel}
+                        channel={p.channel}
+                        displayName={p.displayName}
+                        description={p.description}
+                        onlineInfo={onlineResults.get(p.channel) ?? null}
+                        isCollecting={collecting.has(p.channel)}
+                        activeSession={activeSessionMap.get(p.channel) ?? null}
+                        onCollect={() => handleCollect(p.channel)}
+                        onStartSession={() => handleStartSession(p.channel)}
+                        onStopSession={() => handleStopSession(p.channel)}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Другие онлайн (не CS2) */}
+            {liveChannels.filter((p) => !onlineResults.get(p.channel)?.is_cs2 && !activeSessionMap.has(p.channel)).length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-yellow-400/80 uppercase tracking-wider px-1">
+                  <Wifi className="w-3 h-3" />
+                  Онлайн (не CS2)
+                </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                  {liveChannels
+                    .filter((p) => !onlineResults.get(p.channel)?.is_cs2 && !activeSessionMap.has(p.channel))
+                    .map((p) => (
+                      <StreamerCard
+                        key={p.channel}
+                        channel={p.channel}
+                        displayName={p.displayName}
+                        description={p.description}
+                        onlineInfo={onlineResults.get(p.channel) ?? null}
+                        isCollecting={collecting.has(p.channel)}
+                        activeSession={null}
+                        onCollect={() => handleCollect(p.channel)}
+                        onStartSession={() => handleStartSession(p.channel)}
+                        onStopSession={() => handleStopSession(p.channel)}
+                      />
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Все стримеры (оффлайн + непроверенные) */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+                <WifiOff className="w-3 h-3" />
+                {checking ? "Проверяем..." : offlineChannels.length > 0 ? `Оффлайн (${offlineChannels.length})` : `Все стримеры (${channels.length})`}
+              </div>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+                {(onlineResults.size > 0 ? offlineChannels : uncheckedChannels)
+                  .filter((p) => !activeSessionMap.has(p.channel) && !cs2Channels.includes(p) && !liveChannels.includes(p))
+                  .map((p) => (
+                    <StreamerCard
+                      key={p.channel}
+                      channel={p.channel}
+                      displayName={p.displayName}
+                      description={p.description}
+                      onlineInfo={onlineResults.get(p.channel) ?? null}
+                      isCollecting={collecting.has(p.channel)}
+                      activeSession={null}
+                      onCollect={() => handleCollect(p.channel)}
+                      onStartSession={() => handleStartSession(p.channel)}
+                      onStopSession={() => handleStopSession(p.channel)}
+                    />
+                  ))}
+              </div>
+            </div>
+
+            {/* Состояние до первой проверки */}
+            {onlineResults.size === 0 && !checking && (
+              <div className="text-center py-12 text-muted-foreground">
+                <Activity className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                <p className="text-sm">Загружаем данные стримеров...</p>
+              </div>
+            )}
+
+          </div>
+        </div>
+
+        {/* ── Боковая панель: полный чат выбранного канала ─────────────── */}
+        {selectedFeedChannel && (
+          <div className="w-72 border-l border-border/50 flex flex-col bg-card/30 shrink-0">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <MessageSquare className="w-4 h-4 text-primary" />
+                {selectedFeedChannel}
+              </div>
+              <button
+                onClick={() => setSelectedFeedChannel(null)}
+                className="text-muted-foreground hover:text-foreground text-xs"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <LiveChatFeed channel={selectedFeedChannel} />
+            </div>
           </div>
         )}
-
-        {/* ── Сохранённые сессии ──────────────────────────────────────── */}
-        {(savedSessions?.length ?? 0) > 0 && (
-          <Card className="border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  Сохранённые сессии ({savedSessions!.length})
-                </div>
-                <Button
-                  size="sm" variant="ghost" className="h-7 w-7 p-0"
-                  onClick={() => setSavedExpanded((v) => !v)}
-                >
-                  {savedExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            {savedExpanded && (
-              <CardContent className="space-y-2 pt-0">
-                {savedSessions!.slice(0, 20).map((s) => (
-                  <div
-                    key={s.file ?? s.started_at}
-                    className={cn(
-                      "flex items-center justify-between px-3 py-2 rounded-lg border cursor-pointer transition-colors",
-                      selectedSession === s.channel
-                        ? "border-primary/40 bg-primary/5"
-                        : "border-border/30 hover:border-border/60"
-                    )}
-                    onClick={() => setSelectedSession(selectedSession === s.channel ? null : s.channel)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-1.5 h-1.5 rounded-full",
-                        s.status === "recording" ? "bg-green-500 animate-pulse" :
-                        s.status === "finished" ? "bg-muted-foreground" : "bg-destructive"
-                      )} />
-                      <div>
-                        <div className="text-sm font-medium flex items-center gap-2">
-                          {presetMap.get(s.channel)?.displayName ?? s.channel}
-                          {s.game_name && (
-                            <span className="text-xs text-muted-foreground">{s.game_name}</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatAgo(s.started_at)} · {formatDuration(s.started_at, s.finished_at)} ·{" "}
-                          {s.stop_reason && <span className="text-muted-foreground/60">{s.stop_reason}</span>}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-green-400">{s.message_count}</span>
-                      <span className="text-xs text-muted-foreground">сообщ.</span>
-                      <Eye className="w-3.5 h-3.5 text-muted-foreground" />
-                    </div>
-                  </div>
-                ))}
-
-                {/* Просмотр сообщений выбранной сессии */}
-                {selectedSession && sessionMsgs && (
-                  <div className="mt-3 border border-border/40 rounded-lg overflow-hidden">
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-border/40 bg-muted/20">
-                      <span className="text-sm font-medium flex items-center gap-2">
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        {presetMap.get(selectedSession)?.displayName ?? selectedSession}
-                        <Badge variant="outline" className="text-xs">
-                          {sessionMsgs.status}
-                        </Badge>
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {sessionMsgs.total} сообщений · показано {sessionMsgs.messages.length}
-                      </span>
-                    </div>
-                    <div className="h-72 overflow-y-auto font-mono text-xs p-2 space-y-0.5 bg-card/50">
-                      {sessionMsgs.messages.map((msg: SessionMessage, i: number) => (
-                        <div key={i} className="flex gap-2 leading-5">
-                          <span className="text-blue-400 shrink-0 font-medium">{msg.user}:</span>
-                          <span className="text-foreground/90 break-all">{msg.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            )}
-          </Card>
-        )}
-
-        {/* ── Инфо о полной истории ────────────────────────────────────── */}
-        <Card className="border-border/30 bg-muted/10">
-          <CardContent className="px-5 py-4">
-            <div className="text-sm font-medium mb-2 flex items-center gap-2">
-              <MessageSquare className="w-4 h-4 text-muted-foreground" />
-              О полной истории чата стримера
-            </div>
-            <div className="text-xs text-muted-foreground space-y-1.5 leading-relaxed">
-              <p>
-                <strong className="text-foreground">Записывать с начала стрима</strong> — невозможно технически: Twitch не хранит IRC-историю до момента подключения. Чат существует только в реальном времени.
-              </p>
-              <p>
-                <strong className="text-foreground">Решение:</strong> нажмите <strong>«Запись»</strong> рядом со стримером, который уже онлайн — и система запишет <em>все</em> сообщения с момента нажатия до конца стрима. Автостоп при уходе в офлайн.
-              </p>
-              <p>
-                <strong className="text-foreground">«Сбор паттернов»</strong> — другой режим: собирает N сообщений и сразу анализирует/классифицирует для обучения бота.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
       </div>
+
+      {/* ── Нижняя строка статуса планировщика ────────────────────────── */}
+      {schedulerStatus && (
+        <div className="px-6 py-2 border-t border-border/30 bg-muted/10 flex items-center gap-4 text-[11px] text-muted-foreground shrink-0">
+          <Bot className="w-3.5 h-3.5 shrink-0" />
+          <span>Планировщик: <span className={schedulerStatus.running ? "text-green-400" : "text-muted-foreground"}>{schedulerStatus.running ? "запущен" : "остановлен"}</span></span>
+          <span>·</span>
+          <span>Поллинг: каждые {schedulerStatus.recording_poll_interval_minutes}м</span>
+          {schedulerStatus.auto_recording_channels.length > 0 && (
+            <>
+              <span>·</span>
+              <span>Авто-запись: <span className="text-green-400">{schedulerStatus.auto_recording_channels.join(", ")}</span></span>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
