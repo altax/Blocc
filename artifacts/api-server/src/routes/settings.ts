@@ -80,4 +80,78 @@ router.patch("/settings", async (req, res): Promise<void> => {
   res.json(serializeSettings(updated));
 });
 
+router.post("/settings/verify-twitch", async (req, res): Promise<void> => {
+  const s = await getOrCreateSettings();
+
+  if (!s.twitchClientId) {
+    res.status(400).json({ ok: false, error: "Client ID не указан" });
+    return;
+  }
+
+  if (!s.twitchClientSecret) {
+    res.status(400).json({ ok: false, error: "Client Secret не указан" });
+    return;
+  }
+
+  try {
+    // 1. Получаем App Access Token
+    const params = new URLSearchParams({
+      client_id: s.twitchClientId,
+      client_secret: s.twitchClientSecret,
+      grant_type: "client_credentials",
+    });
+
+    const tokenResp = await fetch(
+      `https://id.twitch.tv/oauth2/token?${params.toString()}`,
+      { method: "POST", signal: AbortSignal.timeout(10_000) }
+    );
+
+    if (!tokenResp.ok) {
+      const text = await tokenResp.text();
+      res.status(400).json({ ok: false, error: `Ошибка токена (${tokenResp.status}): ${text}` });
+      return;
+    }
+
+    const { access_token } = await tokenResp.json() as { access_token: string };
+
+    // 2. Проверяем несколько стримеров через Helix
+    const testChannels = ["strogo", "rekrent", "s1mple", "shadowkek", "ct0m"];
+    const helixParams = new URLSearchParams();
+    for (const ch of testChannels) helixParams.append("user_login", ch);
+    helixParams.set("first", "20");
+
+    const helixResp = await fetch(
+      `https://api.twitch.tv/helix/streams?${helixParams.toString()}`,
+      {
+        headers: {
+          "Client-ID": s.twitchClientId,
+          "Authorization": `Bearer ${access_token}`,
+        },
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+
+    if (!helixResp.ok) {
+      const text = await helixResp.text();
+      res.status(400).json({ ok: false, error: `Ошибка Helix (${helixResp.status}): ${text}` });
+      return;
+    }
+
+    const helixData = await helixResp.json() as { data: Array<{ user_login: string; game_name: string; type: string }> };
+    const live = helixData.data
+      .filter(s => s.type === "live")
+      .map(s => `${s.user_login} (${s.game_name || "?"})`);
+
+    res.json({
+      ok: true,
+      token_received: true,
+      checked_channels: testChannels,
+      live_count: live.length,
+      live_channels: live,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err?.message ?? "Неизвестная ошибка" });
+  }
+});
+
 export default router;

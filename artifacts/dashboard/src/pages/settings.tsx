@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Save, Bot, Clock, Brain, Key } from "lucide-react";
+import { Save, Bot, Clock, Brain, Key, CheckCircle2, XCircle, Loader2, Radio } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 const DEFAULT_PERSONALITY = `Ты русский зритель CS2 стримов. Пишешь короткие, живые сообщения в чат как настоящий человек.
@@ -47,10 +47,19 @@ const settingsSchema = z.object({
   path: ["max_delay_seconds"]
 });
 
+interface VerifyResult {
+  ok: boolean;
+  error?: string;
+  live_count?: number;
+  live_channels?: string[];
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const initRef = useRef(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
 
   const { data: settings, isLoading } = useGetSettings({
     query: { queryKey: getGetSettingsQueryKey() }
@@ -112,6 +121,20 @@ export default function Settings() {
 
   const onSubmit = (values: z.infer<typeof settingsSchema>) => {
     updateMutation.mutate({ data: values });
+  };
+
+  const verifyTwitch = async () => {
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const resp = await fetch("/api/settings/verify-twitch", { method: "POST" });
+      const data = await resp.json();
+      setVerifyResult(data);
+    } catch {
+      setVerifyResult({ ok: false, error: "Ошибка сети" });
+    } finally {
+      setVerifying(false);
+    }
   };
 
   if (isLoading) {
@@ -240,12 +263,49 @@ export default function Settings() {
                 )}
               />
               <div className="rounded-lg border border-border/40 bg-black/10 p-4 space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Twitch API (для точной проверки онлайна)</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Client ID + Client Secret → автоматически получает App Access Token. Не требует привязки к аккаунту.
-                  </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Twitch API (для точной проверки онлайна)</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Client ID + Client Secret → автоматически получает App Access Token. Не требует привязки к аккаунту.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={verifyTwitch}
+                    disabled={verifying}
+                    className="shrink-0 text-xs"
+                  >
+                    {verifying
+                      ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Проверка...</>
+                      : <><Radio className="w-3 h-3 mr-1.5" />Проверить</>}
+                  </Button>
                 </div>
+
+                {verifyResult && (
+                  <div className={`rounded-md px-3 py-2 text-xs flex items-start gap-2 ${verifyResult.ok ? "bg-green-950/40 border border-green-800/40 text-green-300" : "bg-red-950/40 border border-red-800/40 text-red-300"}`}>
+                    {verifyResult.ok
+                      ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-green-400" />
+                      : <XCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />}
+                    <div>
+                      {verifyResult.ok
+                        ? <>
+                            <span className="font-medium">Подключено!</span>{" "}
+                            Helix API работает.{" "}
+                            {verifyResult.live_count !== undefined && (
+                              <>Онлайн: <span className="font-medium">{verifyResult.live_count}</span> стримеров
+                              {verifyResult.live_channels && verifyResult.live_channels.length > 0 && (
+                                <> ({verifyResult.live_channels.join(", ")})</>
+                              )}</>
+                            )}
+                          </>
+                        : <><span className="font-medium">Ошибка:</span> {verifyResult.error}</>}
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
