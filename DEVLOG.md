@@ -18,6 +18,23 @@
 
 ## Лог разработки
 
+### 2026-06-01 — Device Flow авторизация + Discover CS2 стримеров + проверка OAuth токена ✅
+
+**Что сделано:**
+
+**Device Flow (Twitch авторизация без редиректа):**
+- `artifacts/api-server/src/routes/settings.ts` — два новых эндпоинта: `POST /settings/twitch-device-flow/start` и `POST /settings/twitch-device-flow/poll`
+- `artifacts/dashboard/src/pages/settings.tsx` — кнопка «Получить токен» запускает Device Flow: показывает код и ссылку `twitch.tv/activate`, токен сохраняется автоматически
+
+**Проверка OAuth токена:**
+- `POST /api/settings/verify-oauth-token` — вызывает `https://id.twitch.tv/oauth2/validate`, возвращает логин, user_id, скоупы, флаги `has_chat_read`/`has_chat_edit`
+- UI в Settings: кнопка «Проверить токен» показывает аккаунт бота и список скоупов. Предупреждение если нет `chat:edit`
+
+**Discover живых CS2 стримеров:**
+- `lib/game-detector.ts` — новая функция `searchLiveCS2Streams(credentials, language, maxResults)`: поиск игры через `/helix/games?name=Counter-Strike`, затем живые стримы через `/helix/streams?game_id=...&language=ru&first=50`
+- `artifacts/api-server/src/routes/streamers.ts` — новый эндпоинт `GET /api/streamers/discover-cs2`
+- `artifacts/dashboard/src/pages/streamers.tsx` — новая секция «ВСЕ CS2 НА TWITCH СЕЙЧАС» показывает всех найденных (не только пресеты), с числом зрителей, тайтлом стрима и кнопкой «Паттерны». Авто-обновление каждые 60с
+
 ### 2026-06-01 — Переработка проверки онлайна стримеров: Helix API + GQL fallback ✅
 
 **Проблема:** Анонимный Twitch GQL с публичным `kimne78kx3ncx6brgo4mv6wki5h1ko` ненадёжен — возвращает `stream: null` для онлайн-стримеров (stale кэш, rate limits). Из-за этого часть онлайн-каналов отображалась как offline.

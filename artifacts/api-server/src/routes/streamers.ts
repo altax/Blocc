@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { listStreamers, loadAnalysis, loadPatterns, loadRawSamples } from "../lib/streamer-analyzer";
 import { detectLiveChannels } from "../lib/live-detector";
-import { batchCheckGames, type TwitchCredentials } from "../lib/game-detector";
+import { batchCheckGames, searchLiveCS2Streams, type TwitchCredentials } from "../lib/game-detector";
 import { collectPatternsFromChannel } from "../lib/bot-engine/pattern-learner";
 import { RU_CS2_STREAMERS, getPresetChannels } from "../lib/cs2-ru-streamers";
 import { db } from "@workspace/db";
@@ -63,6 +63,22 @@ router.post("/streamers/check-online", async (req, res): Promise<void> => {
     res.json({ results, checked_at: new Date().toISOString() });
   } catch (err) {
     res.status(500).json({ error: String(err) });
+  }
+});
+
+// Discover — найти живые CS2 стримы через Helix по game_id
+router.get("/streamers/discover-cs2", async (req, res): Promise<void> => {
+  try {
+    const credentials = await getTwitchCredentials();
+    if (!credentials?.clientId) {
+      res.json({ streams: [], error: "Client ID не настроен" });
+      return;
+    }
+    const language = (req.query.language as string) || "ru";
+    const streams = await searchLiveCS2Streams(credentials, language, 50);
+    res.json({ streams, language, total: streams.length });
+  } catch (err) {
+    res.status(500).json({ streams: [], error: String(err) });
   }
 });
 

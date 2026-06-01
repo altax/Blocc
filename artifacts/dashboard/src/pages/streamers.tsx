@@ -25,8 +25,22 @@ import {
   Radio, Download, Loader2, Zap, Square,
   MessageSquare, RefreshCw, Wifi, WifiOff,
   CircleDot, ChevronDown, ChevronUp, Activity,
-  Clock, Eye, Bot,
+  Clock, Eye, Bot, Globe, Users,
 } from "lucide-react";
+
+interface LiveCS2Stream {
+  channel: string;
+  display_name: string;
+  game_name: string;
+  viewer_count: number;
+  language: string;
+  title: string;
+}
+
+function formatViewers(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}к`;
+  return String(n);
+}
 
 function formatAgo(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -294,6 +308,8 @@ export default function Streamers() {
   const [collecting, setCollecting] = useState<Set<string>>(new Set());
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
   const [selectedFeedChannel, setSelectedFeedChannel] = useState<string | null>(null);
+  const [discoveredStreams, setDiscoveredStreams] = useState<LiveCS2Stream[]>([]);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
 
   const { data: presets } = useGetStreamerPresets();
   const checkOnline = useCheckStreamersOnline();
@@ -342,10 +358,29 @@ export default function Streamers() {
     }
   }, [checking, checkOnline, toast]);
 
+  const discoverCS2 = useCallback(async () => {
+    setDiscoverLoading(true);
+    try {
+      const resp = await fetch("/api/streamers/discover-cs2");
+      const data = await resp.json() as { streams: LiveCS2Stream[]; error?: string };
+      if (data.streams) {
+        setDiscoveredStreams(data.streams);
+      }
+    } catch {
+      // silent — discover is best-effort
+    } finally {
+      setDiscoverLoading(false);
+    }
+  }, []);
+
   // Авто-проверка при загрузке и каждые 60 секунд
   useEffect(() => {
     runCheck(true);
-    const interval = setInterval(() => runCheck(true), 60_000);
+    discoverCS2();
+    const interval = setInterval(() => {
+      runCheck(true);
+      discoverCS2();
+    }, 60_000);
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -436,7 +471,7 @@ export default function Streamers() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => runCheck(false)}
+            onClick={() => { runCheck(false); discoverCS2(); }}
             disabled={checking}
             className="gap-1.5 h-8 text-xs"
           >
@@ -556,6 +591,73 @@ export default function Streamers() {
                         onStopSession={() => handleStopSession(p.channel)}
                       />
                     ))}
+                </div>
+              </div>
+            )}
+
+            {/* Живые CS2 стримеры (обнаруженные через Helix) */}
+            {(discoveredStreams.length > 0 || discoverLoading) && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-purple-400/80 uppercase tracking-wider px-1">
+                  {discoverLoading
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <Globe className="w-3 h-3" />}
+                  Все CS2 на Twitch сейчас ({discoveredStreams.length})
+                </div>
+                {discoverLoading && discoveredStreams.length === 0 && (
+                  <div className="text-xs text-muted-foreground px-2 py-2">Поиск стримеров через Twitch API...</div>
+                )}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+                  {discoveredStreams
+                    .filter((s) => {
+                      const isPreset = channels.some((p) => p.channel === s.channel);
+                      return !isPreset;
+                    })
+                    .map((s) => (
+                      <Card key={s.channel} className="border-border/30 bg-card/20 hover:bg-card/40 transition-colors">
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center text-sm font-bold shrink-0">
+                              {s.display_name[0].toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <a
+                                  href={`https://twitch.tv/${s.channel}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-semibold text-sm hover:text-purple-300 transition-colors"
+                                >
+                                  {s.display_name}
+                                </a>
+                                <span className="inline-flex items-center gap-1 text-[10px] text-purple-300/70 font-mono">
+                                  <Users className="w-2.5 h-2.5" />
+                                  {formatViewers(s.viewer_count)}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground truncate mt-0.5">{s.title}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs gap-1 shrink-0"
+                              onClick={() => handleCollect(s.channel)}
+                              disabled={collecting.has(s.channel)}
+                            >
+                              {collecting.has(s.channel)
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <Download className="w-3 h-3" />}
+                              Паттерны
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  {discoveredStreams.length > 0 && discoveredStreams.every((s) => channels.some((p) => p.channel === s.channel)) && (
+                    <p className="text-xs text-muted-foreground px-2 col-span-2">
+                      Все найденные стримеры уже есть в списке пресетов.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

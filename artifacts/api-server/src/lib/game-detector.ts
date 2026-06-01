@@ -319,3 +319,92 @@ export async function getChannelGame(
   const map = await batchCheckGames([channel], credentials);
   return map.get(channel) ?? { game_name: null, is_live: false };
 }
+
+export interface LiveCS2Stream {
+  channel: string;
+  display_name: string;
+  game_name: string;
+  viewer_count: number;
+  language: string;
+  title: string;
+}
+
+/**
+ * Ищет живые CS2 стримы через Helix по game_id.
+ * Возвращает стримеров с указанным языком (ru по умолчанию), отсортированных по зрителям.
+ */
+export async function searchLiveCS2Streams(
+  credentials: TwitchCredentials,
+  language = "ru",
+  maxResults = 50
+): Promise<LiveCS2Stream[]> {
+  let bearerToken: string | null = null;
+
+  if (credentials.clientSecret) {
+    try {
+      bearerToken = await getAppAccessToken(credentials.clientId, credentials.clientSecret);
+    } catch (err) {
+      logger.warn({ err }, "searchLiveCS2Streams: failed to get App Access Token");
+    }
+  }
+  if (!bearerToken && credentials.oauthToken) {
+    bearerToken = credentials.oauthToken.replace(/^oauth:/i, "");
+  }
+  if (!bearerToken) return [];
+
+  const authHeader = `Bearer ${bearerToken.replace(/^oauth:/i, "")}`;
+  const clientId = credentials.clientId;
+
+  // Шаг 1: получаем game_id для "Counter-Strike"
+  const gamesResp = await fetch(
+    `https://api.twitch.tv/helix/games?name=Counter-Strike`,
+    {
+      headers: { "Client-ID": clientId, "Authorization": authHeader },
+      signal: AbortSignal.timeout(10_000),
+    }
+  );
+  if (!gamesResp.ok) throw new Error(`Helix /games failed: ${gamesResp.status}`);
+
+  const gamesData = await gamesResp.json() as { data: Array<{ id: string; name: string }> };
+  const gameId = gamesData.data[0]?.id;
+  if (!gameId) return [];
+
+  // Шаг 2: живые стримы по game_id + язык
+  const params = new URLSearchParams({
+    game_id: gameId,
+    first: String(Math.min(maxResults, 100)),
+    language,
+  });
+
+  const streamsResp = await fetch(
+    `https://api.twitch.tv/helix/streams?${params.toString()}`,
+    {
+      headers: { "Client-ID": clientId, "Authorization": authHeader },
+      signal: AbortSignal.timeout(15_000),
+    }
+  );
+  if (!streamsResp.ok) throw new Error(`Helix /streams failed: ${streamsResp.status}`);
+
+  const streamsData = await streamsResp.json() as {
+    data: Array<{
+      user_login: string;
+      user_name: string;
+      game_name: string;
+      viewer_count: number;
+      language: string;
+      title: string;
+      type: string;
+    }>;
+  };
+
+  return streamsData.data
+    .filter((s) => s.type === "live")
+    .map((s) => ({
+      channel: s.user_login.toLowerCase(),
+      display_name: s.user_name,
+      game_name: s.game_name,
+      viewer_count: s.viewer_count,
+      language: s.language,
+      title: s.title,
+    }));
+}

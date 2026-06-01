@@ -256,4 +256,46 @@ router.post("/settings/twitch-device-flow/poll", async (req, res): Promise<void>
   }
 });
 
+// Проверка валидности OAuth токена через /oauth2/validate
+router.post("/settings/verify-oauth-token", async (req, res): Promise<void> => {
+  const s = await getOrCreateSettings();
+  const token = s.twitchOauthToken;
+
+  if (!token) {
+    res.status(400).json({ ok: false, error: "OAuth токен не указан в настройках" });
+    return;
+  }
+
+  try {
+    const rawToken = token.replace(/^oauth:/i, "");
+    const resp = await fetch("https://id.twitch.tv/oauth2/validate", {
+      headers: { "Authorization": `OAuth ${rawToken}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    const data = await resp.json() as any;
+
+    if (!resp.ok) {
+      res.json({ ok: false, error: data?.message ?? `Невалидный токен (${resp.status})` });
+      return;
+    }
+
+    const scopes: string[] = data.scopes ?? [];
+    const hasChatRead = scopes.includes("chat:read");
+    const hasChatEdit = scopes.includes("chat:edit");
+
+    res.json({
+      ok: true,
+      login: data.login ?? null,
+      user_id: data.user_id ?? null,
+      scopes,
+      has_chat_read: hasChatRead,
+      has_chat_edit: hasChatEdit,
+      expires_in: data.expires_in ?? null,
+    });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err?.message ?? "Ошибка сети" });
+  }
+});
+
 export default router;

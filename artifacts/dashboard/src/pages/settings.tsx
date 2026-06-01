@@ -64,6 +64,17 @@ interface DeviceFlow {
   error?: string;
 }
 
+interface TokenValidation {
+  ok: boolean;
+  login?: string;
+  user_id?: string;
+  scopes?: string[];
+  has_chat_read?: boolean;
+  has_chat_edit?: boolean;
+  expires_in?: number;
+  error?: string;
+}
+
 export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -72,6 +83,8 @@ export default function Settings() {
   const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [deviceFlow, setDeviceFlow] = useState<DeviceFlow | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tokenValidation, setTokenValidation] = useState<TokenValidation | null>(null);
+  const [verifyingToken, setVerifyingToken] = useState(false);
 
   const { data: settings, isLoading } = useGetSettings({
     query: { queryKey: getGetSettingsQueryKey() }
@@ -214,6 +227,28 @@ export default function Settings() {
 
   const onSubmit = (values: z.infer<typeof settingsSchema>) => {
     updateMutation.mutate({ data: values });
+  };
+
+  const verifyOAuthToken = async () => {
+    setVerifyingToken(true);
+    setTokenValidation(null);
+    try {
+      const values = form.getValues();
+      if (values.twitch_oauth_token) {
+        await fetch("/api/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ twitch_oauth_token: values.twitch_oauth_token }),
+        });
+      }
+      const resp = await fetch("/api/settings/verify-oauth-token", { method: "POST" });
+      const data = await resp.json();
+      setTokenValidation(data);
+    } catch {
+      setTokenValidation({ ok: false, error: "Ошибка сети" });
+    } finally {
+      setVerifyingToken(false);
+    }
   };
 
   const verifyTwitch = async () => {
@@ -543,6 +578,63 @@ export default function Settings() {
                           >
                             Закрыть
                           </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Кнопка проверки токена */}
+                    <div className="flex items-center gap-2 mt-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={verifyOAuthToken}
+                        disabled={verifyingToken}
+                        className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                      >
+                        {verifyingToken
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <CheckCircle2 className="w-3.5 h-3.5" />}
+                        Проверить токен
+                      </Button>
+                    </div>
+
+                    {tokenValidation && (
+                      <div className={`rounded-lg border p-3 text-xs space-y-1.5 ${
+                        tokenValidation.ok
+                          ? "bg-green-950/30 border-green-800/40"
+                          : "bg-red-950/30 border-red-800/40"
+                      }`}>
+                        {tokenValidation.ok ? (
+                          <>
+                            <div className="flex items-center gap-1.5 text-green-300 font-medium">
+                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                              Токен валиден · аккаунт: <span className="font-bold">{tokenValidation.login}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(tokenValidation.scopes ?? []).map((scope) => (
+                                <span key={scope} className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
+                                  scope === "chat:edit" || scope === "chat:read"
+                                    ? "bg-green-800/40 text-green-300"
+                                    : "bg-muted/40 text-muted-foreground"
+                                }`}>{scope}</span>
+                              ))}
+                              {(tokenValidation.scopes ?? []).length === 0 && (
+                                <span className="text-muted-foreground">нет скоупов</span>
+                              )}
+                            </div>
+                            {!tokenValidation.has_chat_edit && (
+                              <div className="flex items-center gap-1 text-yellow-400/80 mt-1">
+                                <XCircle className="w-3 h-3 shrink-0" />
+                                <span>Нет скоупа <code className="bg-black/30 px-1">chat:edit</code> — бот не сможет писать в чат</span>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-red-300">
+                            <XCircle className="w-3.5 h-3.5 shrink-0" />
+                            {tokenValidation.error}
+                          </div>
                         )}
                       </div>
                     )}
