@@ -256,7 +256,11 @@ export const GetSchedulerStatusResponse = zod.object({
   "patterns_saved": zod.number().nullish(),
   "trigger": zod.enum(['auto', 'manual'])
 })),
-  "total_auto_collections": zod.number()
+  "total_auto_collections": zod.number(),
+  "auto_record_enabled": zod.boolean(),
+  "recording_poll_interval_minutes": zod.number(),
+  "auto_recording_channels": zod.array(zod.string()),
+  "last_recording_check_at": zod.string().nullish()
 })
 
 
@@ -267,12 +271,16 @@ export const startSchedulerBodyCheckIntervalHoursDefault = 3;
 export const startSchedulerBodyMinCollectionIntervalHoursDefault = 12;
 export const startSchedulerBodyMessagesPerChannelDefault = 300;
 export const startSchedulerBodyDetectionWindowSecondsDefault = 30;
+export const startSchedulerBodyRecordingPollIntervalMinutesDefault = 15;
+export const startSchedulerBodyAutoRecordEnabledDefault = true;
 
 export const StartSchedulerBody = zod.object({
   "check_interval_hours": zod.number().default(startSchedulerBodyCheckIntervalHoursDefault),
   "min_collection_interval_hours": zod.number().default(startSchedulerBodyMinCollectionIntervalHoursDefault),
   "messages_per_channel": zod.number().default(startSchedulerBodyMessagesPerChannelDefault),
-  "detection_window_seconds": zod.number().default(startSchedulerBodyDetectionWindowSecondsDefault)
+  "detection_window_seconds": zod.number().default(startSchedulerBodyDetectionWindowSecondsDefault),
+  "recording_poll_interval_minutes": zod.number().default(startSchedulerBodyRecordingPollIntervalMinutesDefault),
+  "auto_record_enabled": zod.boolean().default(startSchedulerBodyAutoRecordEnabledDefault)
 })
 
 export const StartSchedulerResponse = zod.object({
@@ -291,7 +299,11 @@ export const StartSchedulerResponse = zod.object({
   "patterns_saved": zod.number().nullish(),
   "trigger": zod.enum(['auto', 'manual'])
 })),
-  "total_auto_collections": zod.number()
+  "total_auto_collections": zod.number(),
+  "auto_record_enabled": zod.boolean(),
+  "recording_poll_interval_minutes": zod.number(),
+  "auto_recording_channels": zod.array(zod.string()),
+  "last_recording_check_at": zod.string().nullish()
 })
 
 
@@ -314,7 +326,11 @@ export const StopSchedulerResponse = zod.object({
   "patterns_saved": zod.number().nullish(),
   "trigger": zod.enum(['auto', 'manual'])
 })),
-  "total_auto_collections": zod.number()
+  "total_auto_collections": zod.number(),
+  "auto_record_enabled": zod.boolean(),
+  "recording_poll_interval_minutes": zod.number(),
+  "auto_recording_channels": zod.array(zod.string()),
+  "last_recording_check_at": zod.string().nullish()
 })
 
 

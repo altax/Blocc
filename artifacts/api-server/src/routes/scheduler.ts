@@ -13,13 +13,17 @@ router.post("/scheduler/start", async (req, res): Promise<void> => {
     min_collection_interval_hours,
     messages_per_channel,
     detection_window_seconds,
+    recording_poll_interval_minutes,
+    auto_record_enabled,
   } = req.body ?? {};
 
   scheduler.start({
-    checkIntervalMs:       check_interval_hours         ? check_interval_hours * 3_600_000 : undefined,
-    minCollectionIntervalMs: min_collection_interval_hours ? min_collection_interval_hours * 3_600_000 : undefined,
-    messagesPerChannel:    messages_per_channel          ?? undefined,
-    detectionWindowMs:     detection_window_seconds      ? detection_window_seconds * 1000 : undefined,
+    checkIntervalMs:          check_interval_hours              ? check_interval_hours * 3_600_000 : undefined,
+    minCollectionIntervalMs:  min_collection_interval_hours     ? min_collection_interval_hours * 3_600_000 : undefined,
+    messagesPerChannel:       messages_per_channel              ?? undefined,
+    detectionWindowMs:        detection_window_seconds          ? detection_window_seconds * 1000 : undefined,
+    recordingPollIntervalMs:  recording_poll_interval_minutes   ? recording_poll_interval_minutes * 60_000 : undefined,
+    autoRecordEnabled:        auto_record_enabled               ?? undefined,
   });
 
   res.json(scheduler.getStatus());
@@ -36,6 +40,14 @@ router.post("/scheduler/run-now", async (req, res): Promise<void> => {
   scheduler.runNow()
     .then((results) => req.log.info({ results }, "Manual scheduler run complete"))
     .catch((err) => req.log.error({ err }, "Manual scheduler run failed"));
+});
+
+router.post("/scheduler/record-check-now", async (req, res): Promise<void> => {
+  res.json({ started: true, message: "Recording check running in background" });
+
+  scheduler.runRecordingCheckNow()
+    .then(() => req.log.info("Manual recording check complete"))
+    .catch((err) => req.log.error({ err }, "Manual recording check failed"));
 });
 
 export default router;

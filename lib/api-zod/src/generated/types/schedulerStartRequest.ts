@@ -11,4 +11,6 @@ export interface SchedulerStartRequest {
   min_collection_interval_hours?: number;
   messages_per_channel?: number;
   detection_window_seconds?: number;
+  recording_poll_interval_minutes?: number;
+  auto_record_enabled?: boolean;
 }

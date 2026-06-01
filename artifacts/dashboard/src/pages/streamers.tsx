@@ -9,9 +9,11 @@ import {
   useStartSessionRecording,
   useStopSessionRecording,
   useGetSessionMessages,
+  useGetSchedulerStatus,
   getGetActiveSessionsQueryKey,
   getListSessionsQueryKey,
   getGetSessionMessagesQueryKey,
+  getGetSchedulerStatusQueryKey,
   type OnlineCheckItem,
   type SessionSummary,
   type SessionMessage,
@@ -23,8 +25,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
-  Radio, Download, Loader2, Play, Square, Zap,
+  Radio, Download, Loader2, Zap, Square,
   MessageSquare, Clock, Eye, ChevronDown, ChevronUp, Wifi, WifiOff,
+  CircleDot,
 } from "lucide-react";
 
 function formatAgo(iso: string | null | undefined): string {
@@ -284,6 +287,13 @@ export default function Streamers() {
     }
   });
 
+  const { data: schedulerStatus } = useGetSchedulerStatus({
+    query: {
+      queryKey: getGetSchedulerStatusQueryKey(),
+      refetchInterval: 15000,
+    }
+  });
+
   // Сессия для просмотра сообщений
   const { data: sessionMsgs } = useGetSessionMessages(
     selectedSession ?? "",
@@ -442,6 +452,68 @@ export default function Streamers() {
                 <span className="text-green-400">
                   {[...onlineResults.values()].filter((r) => r.is_live).length} онлайн
                 </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Авто-запись (планировщик) ───────────────────────────────── */}
+        <Card className={cn(
+          "border-border/50 transition-colors",
+          schedulerStatus?.auto_record_enabled && schedulerStatus.auto_recording_channels.length > 0
+            ? "border-green-500/30 bg-green-500/5"
+            : ""
+        )}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CircleDot className={cn(
+                "w-4 h-4",
+                schedulerStatus?.auto_record_enabled
+                  ? "text-green-400 animate-pulse"
+                  : "text-muted-foreground"
+              )} />
+              Авто-запись при выходе онлайн
+              {schedulerStatus?.auto_record_enabled
+                ? <Badge variant="outline" className="text-xs border-green-500/40 text-green-400">Активна</Badge>
+                : <Badge variant="outline" className="text-xs text-muted-foreground">Выключена</Badge>
+              }
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {schedulerStatus ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground">Поллинг GQL</span>
+                    <span className="font-medium">каждые {schedulerStatus.recording_poll_interval_minutes}м</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground">Последняя проверка</span>
+                    <span className="font-medium">{formatAgo(schedulerStatus.last_recording_check_at)}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground">Идёт запись</span>
+                    <span className="font-medium text-green-400">
+                      {schedulerStatus.auto_recording_channels.length > 0
+                        ? schedulerStatus.auto_recording_channels.join(", ")
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-muted-foreground">Статус планировщика</span>
+                    <span className={cn("font-medium", schedulerStatus.running ? "text-green-400" : "text-muted-foreground")}>
+                      {schedulerStatus.running ? "запущен" : "остановлен"}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Каждые {schedulerStatus.recording_poll_interval_minutes} минут система проверяет через Twitch API кто из CS2-стримеров вышел онлайн и автоматически начинает запись чата.
+                </p>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Загружаю статус планировщика...
               </div>
             )}
           </CardContent>

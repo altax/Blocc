@@ -855,7 +855,7 @@ components:
 
     SchedulerStatus:
       type: object
-      required: [running, check_interval_hours, min_collection_interval_hours, messages_per_channel, total_auto_collections, last_live_channels, currently_collecting, collection_history]
+      required: [running, check_interval_hours, min_collection_interval_hours, messages_per_channel, total_auto_collections, last_live_channels, currently_collecting, collection_history, auto_record_enabled, recording_poll_interval_minutes, auto_recording_channels]
       properties:
         running:
           type: boolean
@@ -883,6 +883,16 @@ components:
             $ref: "#/components/schemas/CollectionRecord"
         total_auto_collections:
           type: integer
+        auto_record_enabled:
+          type: boolean
+        recording_poll_interval_minutes:
+          type: number
+        auto_recording_channels:
+          type: array
+          items:
+            type: string
+        last_recording_check_at:
+          type: ["string", "null"]
 
     SchedulerStartRequest:
       type: object
@@ -899,6 +909,12 @@ components:
         detection_window_seconds:
           type: integer
           default: 30
+        recording_poll_interval_minutes:
+          type: number
+          default: 15
+        auto_record_enabled:
+          type: boolean
+          default: true
 
     DetectLiveRequest:
       type: object

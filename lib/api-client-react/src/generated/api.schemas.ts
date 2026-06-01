@@ -191,6 +191,11 @@ export interface SchedulerStatus {
   currently_collecting: string[];
   collection_history: CollectionRecord[];
   total_auto_collections: number;
+  auto_record_enabled: boolean;
+  recording_poll_interval_minutes: number;
+  auto_recording_channels: string[];
+  /** @nullable */
+  last_recording_check_at?: string | null;
 }
 
 export interface SchedulerStartRequest {
@@ -198,6 +203,8 @@ export interface SchedulerStartRequest {
   min_collection_interval_hours?: number;
   messages_per_channel?: number;
   detection_window_seconds?: number;
+  recording_poll_interval_minutes?: number;
+  auto_record_enabled?: boolean;
 }
 
 export interface DetectLiveRequest {
