@@ -57,7 +57,7 @@ function LiveChatFeed({ channel, compact = false }: { channel: string; compact?:
   const { data } = useGetSessionMessages(channel, { limit: 150 }, {
     query: {
       queryKey: getGetSessionMessagesQueryKey(channel, { limit: 150 }),
-      refetchInterval: 2000,
+      refetchInterval: 1000,
     },
   });
 

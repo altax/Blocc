@@ -122,19 +122,31 @@ router.get("/sessions/:channel/status", (req, res): void => {
 });
 
 // Получить сообщения активной сессии (с пагинацией)
+// По умолчанию возвращает ПОСЛЕДНИЕ limit сообщений (tail=true).
+// Для постраничного доступа к истории используй offset + tail=false.
 router.get("/sessions/:channel/messages", (req, res): void => {
   const { channel } = req.params;
+  const hasOffset = "offset" in req.query;
   const offset = parseInt(String(req.query.offset ?? "0"), 10);
   const limit = Math.min(parseInt(String(req.query.limit ?? "200"), 10), 1000);
+  // tail=true по умолчанию — возвращает конец (самые свежие сообщения)
+  const tail = req.query.tail !== "false" && !hasOffset;
+
+  const getSlice = (messages: { user: string; text: string; timestamp: string }[]) => {
+    if (tail) {
+      return messages.slice(Math.max(0, messages.length - limit));
+    }
+    return messages.slice(offset, offset + limit);
+  };
 
   const active = getActiveSession(channel);
   if (active) {
-    const slice = active.messages.slice(offset, offset + limit);
+    const slice = getSlice(active.messages);
     res.json({
       channel: active.channel,
       status: "recording",
       total: active.message_count,
-      offset,
+      offset: tail ? Math.max(0, active.message_count - limit) : offset,
       limit,
       messages: slice,
     });
@@ -146,14 +158,14 @@ router.get("/sessions/:channel/messages", (req, res): void => {
   if (saved.length > 0) {
     const session = loadSession(saved[0].file);
     if (session) {
-      const slice = session.messages.slice(offset, offset + limit);
+      const slice = getSlice(session.messages);
       res.json({
         channel: session.channel,
         status: "finished",
         total: session.message_count,
         started_at: session.started_at,
         finished_at: session.finished_at,
-        offset,
+        offset: tail ? Math.max(0, session.message_count - limit) : offset,
         limit,
         messages: slice,
       });
