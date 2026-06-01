@@ -127,6 +127,15 @@ export default function Settings() {
     setVerifying(true);
     setVerifyResult(null);
     try {
+      const values = form.getValues();
+      await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          twitch_client_id: values.twitch_client_id,
+          twitch_client_secret: values.twitch_client_secret,
+        }),
+      });
       const resp = await fetch("/api/settings/verify-twitch", { method: "POST" });
       const data = await resp.json();
       setVerifyResult(data);
