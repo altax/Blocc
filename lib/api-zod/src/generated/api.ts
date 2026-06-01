@@ -359,6 +359,24 @@ export const GetStreamerPresetsResponse = zod.array(GetStreamerPresetsResponseIt
 
 
 /**
+ * @summary Fast GQL-only online check for all preset streamers (~2s, no IRC)
+ */
+export const CheckStreamersOnlineBody = zod.object({
+  "channels": zod.array(zod.string()).optional()
+})
+
+export const CheckStreamersOnlineResponse = zod.object({
+  "results": zod.array(zod.object({
+  "channel": zod.string(),
+  "is_live": zod.boolean(),
+  "game_name": zod.string().nullish(),
+  "is_cs2": zod.boolean()
+})),
+  "checked_at": zod.string()
+})
+
+
+/**
  * @summary Detect which preset channels are currently live (30s IRC window)
  */
 export const detectLiveChannelsBodyWindowMsDefault = 30000;
@@ -452,5 +470,129 @@ export const GetStreamerPatternsResponseItem = zod.object({
   "game": zod.string()
 })
 export const GetStreamerPatternsResponse = zod.array(GetStreamerPatternsResponseItem)
+
+
+/**
+ * @summary List all saved chat sessions
+ */
+export const ListSessionsQueryParams = zod.object({
+  "channel": zod.coerce.string().optional()
+})
+
+export const ListSessionsResponseItem = zod.object({
+  "channel": zod.string(),
+  "started_at": zod.string(),
+  "finished_at": zod.string().nullish(),
+  "status": zod.enum(['recording', 'finished', 'error']),
+  "message_count": zod.number(),
+  "game_name": zod.string().nullish(),
+  "stop_reason": zod.string().nullish(),
+  "file": zod.string().optional()
+})
+export const ListSessionsResponse = zod.array(ListSessionsResponseItem)
+
+
+/**
+ * @summary Get all currently recording sessions
+ */
+export const GetActiveSessionsResponseItem = zod.object({
+  "channel": zod.string(),
+  "started_at": zod.string(),
+  "finished_at": zod.string().nullish(),
+  "status": zod.enum(['recording', 'finished', 'error']),
+  "message_count": zod.number(),
+  "game_name": zod.string().nullish(),
+  "stop_reason": zod.string().nullish(),
+  "file": zod.string().optional()
+})
+export const GetActiveSessionsResponse = zod.array(GetActiveSessionsResponseItem)
+
+
+/**
+ * @summary Start recording full chat session for a channel
+ */
+export const StartSessionRecordingParams = zod.object({
+  "channel": zod.coerce.string()
+})
+
+export const startSessionRecordingBodyPollIntervalMinutesDefault = 2;
+export const startSessionRecordingBodyMaxDurationHoursDefault = 8;
+
+export const StartSessionRecordingBody = zod.object({
+  "poll_interval_minutes": zod.number().default(startSessionRecordingBodyPollIntervalMinutesDefault),
+  "max_duration_hours": zod.number().default(startSessionRecordingBodyMaxDurationHoursDefault)
+})
+
+export const StartSessionRecordingResponse = zod.object({
+  "started": zod.boolean(),
+  "channel": zod.string(),
+  "started_at": zod.string(),
+  "poll_interval_minutes": zod.number().optional(),
+  "max_duration_hours": zod.number().optional(),
+  "note": zod.string().optional()
+})
+
+
+/**
+ * @summary Stop recording a session manually
+ */
+export const StopSessionRecordingParams = zod.object({
+  "channel": zod.coerce.string()
+})
+
+export const StopSessionRecordingResponse = zod.object({
+  "stopped": zod.boolean(),
+  "channel": zod.string()
+})
+
+
+/**
+ * @summary Get current session status for a channel
+ */
+export const GetSessionStatusParams = zod.object({
+  "channel": zod.coerce.string()
+})
+
+export const GetSessionStatusResponse = zod.object({
+  "channel": zod.string(),
+  "started_at": zod.string(),
+  "finished_at": zod.string().nullish(),
+  "status": zod.enum(['recording', 'finished', 'error']),
+  "message_count": zod.number(),
+  "game_name": zod.string().nullish(),
+  "stop_reason": zod.string().nullish(),
+  "file": zod.string().optional()
+})
+
+
+/**
+ * @summary Get messages from active or last session for a channel
+ */
+export const GetSessionMessagesParams = zod.object({
+  "channel": zod.coerce.string()
+})
+
+export const getSessionMessagesQueryOffsetDefault = 0;
+export const getSessionMessagesQueryLimitDefault = 200;
+
+export const GetSessionMessagesQueryParams = zod.object({
+  "offset": zod.coerce.number().default(getSessionMessagesQueryOffsetDefault),
+  "limit": zod.coerce.number().default(getSessionMessagesQueryLimitDefault)
+})
+
+export const GetSessionMessagesResponse = zod.object({
+  "channel": zod.string(),
+  "status": zod.string(),
+  "total": zod.number(),
+  "started_at": zod.string().optional(),
+  "finished_at": zod.string().nullish(),
+  "offset": zod.number(),
+  "limit": zod.number(),
+  "messages": zod.array(zod.object({
+  "user": zod.string(),
+  "text": zod.string(),
+  "timestamp": zod.string()
+}))
+})
 
 

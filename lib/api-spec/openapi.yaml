@@ -26,6 +26,8 @@ tags:
     description: Per-streamer data collection and analysis
   - name: scheduler
     description: Auto-scheduler for live detection and chat collection
+  - name: sessions
+    description: Live chat session recording
 
 paths:
   /healthz:
@@ -343,6 +345,29 @@ paths:
                 items:
                   $ref: "#/components/schemas/StreamerPreset"
 
+  /streamers/check-online:
+    post:
+      operationId: checkStreamersOnline
+      tags: [streamers]
+      summary: Fast GQL-only online check for all preset streamers (~2s, no IRC)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channels:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Online check results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnlineCheckResult"
+
   /streamers/detect-live-sync:
     post:
       operationId: detectLiveChannels
@@ -436,6 +461,144 @@ paths:
                   $ref: "#/components/schemas/PatternEntry"
         "404":
           description: No data found
+
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List all saved chat sessions
+      parameters:
+        - name: channel
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sessions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionSummary"
+
+  /sessions/active:
+    get:
+      operationId: getActiveSessions
+      tags: [sessions]
+      summary: Get all currently recording sessions
+      responses:
+        "200":
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SessionSummary"
+
+  /sessions/{channel}/start:
+    post:
+      operationId: startSessionRecording
+      tags: [sessions]
+      summary: Start recording full chat session for a channel
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartSessionRequest"
+      responses:
+        "200":
+          description: Session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartSessionResponse"
+        "409":
+          description: Session already recording
+
+  /sessions/{channel}/stop:
+    post:
+      operationId: stopSessionRecording
+      tags: [sessions]
+      summary: Stop recording a session manually
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session stopped
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [stopped, channel]
+                properties:
+                  stopped:
+                    type: boolean
+                  channel:
+                    type: string
+
+  /sessions/{channel}/status:
+    get:
+      operationId: getSessionStatus
+      tags: [sessions]
+      summary: Get current session status for a channel
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionSummary"
+        "404":
+          description: No session found
+
+  /sessions/{channel}/messages:
+    get:
+      operationId: getSessionMessages
+      tags: [sessions]
+      summary: Get messages from active or last session for a channel
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+      responses:
+        "200":
+          description: Session messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionMessagesResult"
+        "404":
+          description: No session found
 
 components:
   schemas:
@@ -895,3 +1058,110 @@ components:
           type: array
           items:
             type: string
+
+    OnlineCheckItem:
+      type: object
+      required: [channel, is_live, is_cs2]
+      properties:
+        channel:
+          type: string
+        is_live:
+          type: boolean
+        game_name:
+          type: ["string", "null"]
+        is_cs2:
+          type: boolean
+
+    OnlineCheckResult:
+      type: object
+      required: [results, checked_at]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/OnlineCheckItem"
+        checked_at:
+          type: string
+
+    SessionMessage:
+      type: object
+      required: [user, text, timestamp]
+      properties:
+        user:
+          type: string
+        text:
+          type: string
+        timestamp:
+          type: string
+
+    SessionSummary:
+      type: object
+      required: [channel, started_at, status, message_count]
+      properties:
+        channel:
+          type: string
+        started_at:
+          type: string
+        finished_at:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [recording, finished, error]
+        message_count:
+          type: integer
+        game_name:
+          type: ["string", "null"]
+        stop_reason:
+          type: ["string", "null"]
+        file:
+          type: string
+
+    StartSessionRequest:
+      type: object
+      properties:
+        poll_interval_minutes:
+          type: number
+          default: 2
+        max_duration_hours:
+          type: number
+          default: 8
+
+    StartSessionResponse:
+      type: object
+      required: [started, channel, started_at]
+      properties:
+        started:
+          type: boolean
+        channel:
+          type: string
+        started_at:
+          type: string
+        poll_interval_minutes:
+          type: number
+        max_duration_hours:
+          type: number
+        note:
+          type: string
+
+    SessionMessagesResult:
+      type: object
+      required: [channel, status, total, offset, limit, messages]
+      properties:
+        channel:
+          type: string
+        status:
+          type: string
+        total:
+          type: integer
+        started_at:
+          type: string
+        finished_at:
+          type: ["string", "null"]
+        offset:
+          type: integer
+        limit:
+          type: integer
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionMessage"

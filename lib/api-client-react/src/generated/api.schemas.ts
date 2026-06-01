@@ -289,6 +289,74 @@ export interface StreamerAnalysis {
   style_notes: string[];
 }
 
+export interface OnlineCheckItem {
+  channel: string;
+  is_live: boolean;
+  /** @nullable */
+  game_name?: string | null;
+  is_cs2: boolean;
+}
+
+export interface OnlineCheckResult {
+  results: OnlineCheckItem[];
+  checked_at: string;
+}
+
+export interface SessionMessage {
+  user: string;
+  text: string;
+  timestamp: string;
+}
+
+export type SessionSummaryStatus = typeof SessionSummaryStatus[keyof typeof SessionSummaryStatus];
+
+
+export const SessionSummaryStatus = {
+  recording: 'recording',
+  finished: 'finished',
+  error: 'error',
+} as const;
+
+export interface SessionSummary {
+  channel: string;
+  started_at: string;
+  /** @nullable */
+  finished_at?: string | null;
+  status: SessionSummaryStatus;
+  message_count: number;
+  /** @nullable */
+  game_name?: string | null;
+  /** @nullable */
+  stop_reason?: string | null;
+  file?: string;
+}
+
+export interface StartSessionRequest {
+  poll_interval_minutes?: number;
+  max_duration_hours?: number;
+}
+
+export interface StartSessionResponse {
+  started: boolean;
+  channel: string;
+  started_at: string;
+  poll_interval_minutes?: number;
+  max_duration_hours?: number;
+  note?: string;
+}
+
+export interface SessionMessagesResult {
+  channel: string;
+  status: string;
+  total: number;
+  started_at?: string;
+  /** @nullable */
+  finished_at?: string | null;
+  offset: number;
+  limit: number;
+  messages: SessionMessage[];
+}
+
 export type GetLogsParams = {
 limit?: number;
 type?: GetLogsType;
@@ -325,9 +393,27 @@ export type RunSchedulerNow200 = {
   message: string;
 };
 
+export type CheckStreamersOnlineBody = {
+  channels?: string[];
+};
+
 export type CollectStreamerChat200 = {
   started: boolean;
   channel: string;
   message_count: number;
+};
+
+export type ListSessionsParams = {
+channel?: string;
+};
+
+export type StopSessionRecording200 = {
+  stopped: boolean;
+  channel: string;
+};
+
+export type GetSessionMessagesParams = {
+offset?: number;
+limit?: number;
 };
 

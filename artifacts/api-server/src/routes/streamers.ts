@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { listStreamers, loadAnalysis, loadPatterns, loadRawSamples } from "../lib/streamer-analyzer";
 import { detectLiveChannels } from "../lib/live-detector";
+import { batchCheckGames } from "../lib/game-detector";
 import { collectPatternsFromChannel } from "../lib/bot-engine/pattern-learner";
 import { RU_CS2_STREAMERS, getPresetChannels } from "../lib/cs2-ru-streamers";
 
@@ -24,6 +25,31 @@ router.get("/streamers", async (req, res): Promise<void> => {
 // Пресеты стримеров
 router.get("/streamers/presets", async (req, res): Promise<void> => {
   res.json(RU_CS2_STREAMERS);
+});
+
+// Быстрая проверка онлайна через GQL — ~2 секунды (без IRC)
+router.post("/streamers/check-online", async (req, res): Promise<void> => {
+  const channels: string[] = req.body?.channels ?? getPresetChannels(3);
+  try {
+    const gameMap = await batchCheckGames(channels);
+    const results = channels.map((channel) => {
+      const info = gameMap.get(channel);
+      return {
+        channel,
+        is_live: info?.is_live ?? false,
+        game_name: info?.game_name ?? null,
+        is_cs2: info?.is_live ? ["Counter-Strike 2", "Counter-Strike: Global Offensive", "Counter-Strike"].includes(info.game_name ?? "") : false,
+      };
+    });
+    results.sort((a, b) => {
+      if (a.is_cs2 !== b.is_cs2) return a.is_cs2 ? -1 : 1;
+      if (a.is_live !== b.is_live) return a.is_live ? -1 : 1;
+      return 0;
+    });
+    res.json({ results, checked_at: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
 // Детектор живых каналов — 30-секундное IRC-окно

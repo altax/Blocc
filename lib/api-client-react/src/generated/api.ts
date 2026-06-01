@@ -28,6 +28,7 @@ import type {
   BulkLearnRequest,
   BulkLearnResponse,
   ChatPattern,
+  CheckStreamersOnlineBody,
   ClearPatterns200,
   CollectChatRequest,
   CollectStreamerChat200,
@@ -35,15 +36,23 @@ import type {
   GetLogsParams,
   GetMessagesParams,
   GetPatternsParams,
+  GetSessionMessagesParams,
   HealthStatus,
   LearnRequest,
   LearnResponse,
+  ListSessionsParams,
   LiveDetectionResult,
   LogEntry,
+  OnlineCheckResult,
   PatternEntry,
   RunSchedulerNow200,
   SchedulerStartRequest,
   SchedulerStatus,
+  SessionMessagesResult,
+  SessionSummary,
+  StartSessionRequest,
+  StartSessionResponse,
+  StopSessionRecording200,
   StreamerAnalysis,
   StreamerFile,
   StreamerPreset
@@ -1486,6 +1495,77 @@ export function useGetStreamerPresets<TData = Awaited<ReturnType<typeof getStrea
 
 
 
+export const getCheckStreamersOnlineUrl = () => {
+
+
+
+
+  return `/api/streamers/check-online`
+}
+
+/**
+ * @summary Fast GQL-only online check for all preset streamers (~2s, no IRC)
+ */
+export const checkStreamersOnline = async (checkStreamersOnlineBody?: CheckStreamersOnlineBody, options?: RequestInit): Promise<OnlineCheckResult> => {
+
+  return customFetch<OnlineCheckResult>(getCheckStreamersOnlineUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      checkStreamersOnlineBody,)
+  }
+);}
+
+
+
+
+export const getCheckStreamersOnlineMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkStreamersOnline>>, TError,{data?: BodyType<CheckStreamersOnlineBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkStreamersOnline>>, TError,{data?: BodyType<CheckStreamersOnlineBody>}, TContext> => {
+
+const mutationKey = ['checkStreamersOnline'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkStreamersOnline>>, {data?: BodyType<CheckStreamersOnlineBody>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  checkStreamersOnline(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CheckStreamersOnlineMutationResult = NonNullable<Awaited<ReturnType<typeof checkStreamersOnline>>>
+    export type CheckStreamersOnlineMutationBody = BodyType<CheckStreamersOnlineBody> | undefined
+    export type CheckStreamersOnlineMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Fast GQL-only online check for all preset streamers (~2s, no IRC)
+ */
+export const useCheckStreamersOnline = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkStreamersOnline>>, TError,{data?: BodyType<CheckStreamersOnlineBody>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof checkStreamersOnline>>,
+        TError,
+        {data?: BodyType<CheckStreamersOnlineBody>},
+        TContext
+      > => {
+      return useMutation(getCheckStreamersOnlineMutationOptions(options));
+    }
+
 export const getDetectLiveChannelsUrl = () => {
 
 
@@ -1771,6 +1851,475 @@ export function useGetStreamerPatterns<TData = Awaited<ReturnType<typeof getStre
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStreamerPatternsQueryOptions(channel,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListSessionsUrl = (params?: ListSessionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/sessions?${stringifiedParams}` : `/api/sessions`
+}
+
+/**
+ * @summary List all saved chat sessions
+ */
+export const listSessions = async (params?: ListSessionsParams, options?: RequestInit): Promise<SessionSummary[]> => {
+
+  return customFetch<SessionSummary[]>(getListSessionsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSessionsQueryKey = (params?: ListSessionsParams,) => {
+    return [
+    `/api/sessions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listSessions>>, TError = ErrorType<unknown>>(params?: ListSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSessionsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSessions>>> = ({ signal }) => listSessions(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listSessions>>>
+export type ListSessionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all saved chat sessions
+ */
+
+export function useListSessions<TData = Awaited<ReturnType<typeof listSessions>>, TError = ErrorType<unknown>>(
+ params?: ListSessionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSessionsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetActiveSessionsUrl = () => {
+
+
+
+
+  return `/api/sessions/active`
+}
+
+/**
+ * @summary Get all currently recording sessions
+ */
+export const getActiveSessions = async ( options?: RequestInit): Promise<SessionSummary[]> => {
+
+  return customFetch<SessionSummary[]>(getGetActiveSessionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetActiveSessionsQueryKey = () => {
+    return [
+    `/api/sessions/active`
+    ] as const;
+    }
+
+
+export const getGetActiveSessionsQueryOptions = <TData = Awaited<ReturnType<typeof getActiveSessions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActiveSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetActiveSessionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getActiveSessions>>> = ({ signal }) => getActiveSessions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getActiveSessions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetActiveSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof getActiveSessions>>>
+export type GetActiveSessionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get all currently recording sessions
+ */
+
+export function useGetActiveSessions<TData = Awaited<ReturnType<typeof getActiveSessions>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getActiveSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetActiveSessionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getStartSessionRecordingUrl = (channel: string,) => {
+
+
+
+
+  return `/api/sessions/${channel}/start`
+}
+
+/**
+ * @summary Start recording full chat session for a channel
+ */
+export const startSessionRecording = async (channel: string,
+    startSessionRequest?: StartSessionRequest, options?: RequestInit): Promise<StartSessionResponse> => {
+
+  return customFetch<StartSessionResponse>(getStartSessionRecordingUrl(channel),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      startSessionRequest,)
+  }
+);}
+
+
+
+
+export const getStartSessionRecordingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSessionRecording>>, TError,{channel: string;data?: BodyType<StartSessionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startSessionRecording>>, TError,{channel: string;data?: BodyType<StartSessionRequest>}, TContext> => {
+
+const mutationKey = ['startSessionRecording'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startSessionRecording>>, {channel: string;data?: BodyType<StartSessionRequest>}> = (props) => {
+          const {channel,data} = props ?? {};
+
+          return  startSessionRecording(channel,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartSessionRecordingMutationResult = NonNullable<Awaited<ReturnType<typeof startSessionRecording>>>
+    export type StartSessionRecordingMutationBody = BodyType<StartSessionRequest> | undefined
+    export type StartSessionRecordingMutationError = ErrorType<void>
+
+    /**
+ * @summary Start recording full chat session for a channel
+ */
+export const useStartSessionRecording = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startSessionRecording>>, TError,{channel: string;data?: BodyType<StartSessionRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startSessionRecording>>,
+        TError,
+        {channel: string;data?: BodyType<StartSessionRequest>},
+        TContext
+      > => {
+      return useMutation(getStartSessionRecordingMutationOptions(options));
+    }
+
+export const getStopSessionRecordingUrl = (channel: string,) => {
+
+
+
+
+  return `/api/sessions/${channel}/stop`
+}
+
+/**
+ * @summary Stop recording a session manually
+ */
+export const stopSessionRecording = async (channel: string, options?: RequestInit): Promise<StopSessionRecording200> => {
+
+  return customFetch<StopSessionRecording200>(getStopSessionRecordingUrl(channel),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getStopSessionRecordingMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stopSessionRecording>>, TError,{channel: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof stopSessionRecording>>, TError,{channel: string}, TContext> => {
+
+const mutationKey = ['stopSessionRecording'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof stopSessionRecording>>, {channel: string}> = (props) => {
+          const {channel} = props ?? {};
+
+          return  stopSessionRecording(channel,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StopSessionRecordingMutationResult = NonNullable<Awaited<ReturnType<typeof stopSessionRecording>>>
+
+    export type StopSessionRecordingMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Stop recording a session manually
+ */
+export const useStopSessionRecording = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof stopSessionRecording>>, TError,{channel: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof stopSessionRecording>>,
+        TError,
+        {channel: string},
+        TContext
+      > => {
+      return useMutation(getStopSessionRecordingMutationOptions(options));
+    }
+
+export const getGetSessionStatusUrl = (channel: string,) => {
+
+
+
+
+  return `/api/sessions/${channel}/status`
+}
+
+/**
+ * @summary Get current session status for a channel
+ */
+export const getSessionStatus = async (channel: string, options?: RequestInit): Promise<SessionSummary> => {
+
+  return customFetch<SessionSummary>(getGetSessionStatusUrl(channel),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSessionStatusQueryKey = (channel: string,) => {
+    return [
+    `/api/sessions/${channel}/status`
+    ] as const;
+    }
+
+
+export const getGetSessionStatusQueryOptions = <TData = Awaited<ReturnType<typeof getSessionStatus>>, TError = ErrorType<void>>(channel: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSessionStatusQueryKey(channel);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSessionStatus>>> = ({ signal }) => getSessionStatus(channel, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(channel), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSessionStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSessionStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getSessionStatus>>>
+export type GetSessionStatusQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get current session status for a channel
+ */
+
+export function useGetSessionStatus<TData = Awaited<ReturnType<typeof getSessionStatus>>, TError = ErrorType<void>>(
+ channel: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSessionStatusQueryOptions(channel,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetSessionMessagesUrl = (channel: string,
+    params?: GetSessionMessagesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/sessions/${channel}/messages?${stringifiedParams}` : `/api/sessions/${channel}/messages`
+}
+
+/**
+ * @summary Get messages from active or last session for a channel
+ */
+export const getSessionMessages = async (channel: string,
+    params?: GetSessionMessagesParams, options?: RequestInit): Promise<SessionMessagesResult> => {
+
+  return customFetch<SessionMessagesResult>(getGetSessionMessagesUrl(channel,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSessionMessagesQueryKey = (channel: string,
+    params?: GetSessionMessagesParams,) => {
+    return [
+    `/api/sessions/${channel}/messages`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSessionMessagesQueryOptions = <TData = Awaited<ReturnType<typeof getSessionMessages>>, TError = ErrorType<void>>(channel: string,
+    params?: GetSessionMessagesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSessionMessagesQueryKey(channel,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSessionMessages>>> = ({ signal }) => getSessionMessages(channel,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(channel), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSessionMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSessionMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof getSessionMessages>>>
+export type GetSessionMessagesQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get messages from active or last session for a channel
+ */
+
+export function useGetSessionMessages<TData = Awaited<ReturnType<typeof getSessionMessages>>, TError = ErrorType<void>>(
+ channel: string,
+    params?: GetSessionMessagesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSessionMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSessionMessagesQueryOptions(channel,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
