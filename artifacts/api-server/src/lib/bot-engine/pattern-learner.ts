@@ -10,6 +10,7 @@ import {
   type RawSample,
   type PatternEntry,
 } from "../streamer-analyzer";
+import { emitLearningEvent, recordStats } from "../learning-events";
 
 interface RawMessage {
   user: string;
@@ -199,4 +200,128 @@ async function savePatterns(channel: string, messages: RawMessage[]): Promise<nu
 
   logger.info({ channel, saved: toSave.length }, "Saved chat patterns + files");
   return toSave.length;
+}
+
+// ─── Incremental (real-time) learning ──────────────────────────────────────
+
+/**
+ * In-memory аккумулятор: channel → content → {count, type, lang, game}
+ * Накапливает паттерны между flush-ами.
+ */
+const accumulator = new Map<
+  string,
+  Map<string, { count: number; type: string; lang: string; game: string }>
+>();
+
+/**
+ * Обрабатывает одно сообщение из IRC в режиме реального времени.
+ * Вызывается session-recorder'ом на каждое входящее сообщение.
+ * Эмитит события обучения — видны в /api/learning/feed.
+ */
+export function processMessageForLearning(
+  channel: string,
+  user: string,
+  text: string
+): void {
+  const passed = isHumanLike(text);
+
+  const patternType = classifyPattern(text);
+  const lang = detectLanguage(text);
+  const game = detectGame(text);
+
+  // Событие: сообщение классифицировано (показываем все, даже отфильтрованные)
+  emitLearningEvent({
+    type: "msg_classified",
+    channel,
+    msg: { user, text },
+    classification: { pattern_type: patternType, lang, game },
+  });
+
+  if (!passed) return; // ботокоманды, ссылки — не учим
+
+  recordStats(channel, "processed");
+
+  if (!accumulator.has(channel)) accumulator.set(channel, new Map());
+  const acc = accumulator.get(channel)!;
+  const key = text.trim();
+  const existing = acc.get(key);
+
+  if (existing) {
+    existing.count++;
+    // Событие: частота паттерна выросла
+    emitLearningEvent({
+      type: "pattern_updated",
+      channel,
+      pattern: { content: text, pattern_type: patternType, frequency: existing.count, is_new: false },
+    });
+    recordStats(channel, "updated");
+  } else {
+    acc.set(key, { count: 1, type: patternType, lang, game });
+    // Событие: обнаружен новый паттерн
+    emitLearningEvent({
+      type: "pattern_new",
+      channel,
+      pattern: { content: text, pattern_type: patternType, frequency: 1, is_new: true },
+    });
+    recordStats(channel, "new");
+  }
+}
+
+/**
+ * Записывает накопленные паттерны в PostgreSQL.
+ * Вызывается каждые 100 сообщений и при завершении сессии.
+ */
+export async function flushAccumulatorToDB(channel: string): Promise<number> {
+  const acc = accumulator.get(channel);
+  if (!acc || acc.size === 0) return 0;
+
+  // Сортируем по приоритету (ru + cs2 + частота)
+  const sorted = Array.from(acc.entries())
+    .sort((a, b) => {
+      const score = (e: (typeof a)) =>
+        (e[1].lang === "ru" ? 3 : e[1].lang === "mixed" ? 1 : 0) +
+        (e[1].game === "cs2" ? 2 : 0) +
+        e[1].count;
+      return score(b) - score(a);
+    })
+    .slice(0, 250);
+
+  let saved = 0;
+  for (const [content, { count, type, lang, game }] of sorted) {
+    try {
+      await db
+        .insert(chatPatternsTable)
+        .values({ sourceChannel: channel, patternType: type, content, frequency: count, language: lang, game })
+        .onConflictDoNothing();
+      saved++;
+    } catch { /* ignore individual errors */ }
+  }
+
+  acc.clear();
+  recordStats(channel, "flush");
+  emitLearningEvent({
+    type: "batch_flushed",
+    channel,
+    batch_stats: { processed: sorted.length, saved },
+  });
+
+  logger.info({ channel, saved }, "Incremental learning: flushed accumulator to DB");
+  return saved;
+}
+
+/**
+ * Возвращает состояние аккумулятора для отображения в дашборде.
+ */
+export function getAccumulatorPreview(): Array<{
+  channel: string;
+  pending: number;
+  top5: Array<{ content: string; count: number; type: string }>;
+}> {
+  return Array.from(accumulator.entries()).map(([channel, acc]) => {
+    const sorted = Array.from(acc.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 5)
+      .map(([content, v]) => ({ content, count: v.count, type: v.type }));
+    return { channel, pending: acc.size, top5: sorted };
+  });
 }

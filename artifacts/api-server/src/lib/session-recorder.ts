@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { logger } from "./logger";
 import { getChannelGame } from "./game-detector";
+import { processMessageForLearning, flushAccumulatorToDB } from "./bot-engine/pattern-learner";
 
 export interface SessionMessage {
   user: string;
@@ -93,6 +94,11 @@ export function startSessionRecording(
     saveSessionToDisk(session);
     activeSessions.delete(channel.toLowerCase());
 
+    // Финальный flush при завершении сессии
+    flushAccumulatorToDB(channel).catch((err) =>
+      logger.warn({ err, channel }, "Final learning flush failed on session end")
+    );
+
     logger.info({ channel, reason, messages: session.message_count }, "Session recording finished");
   };
 
@@ -118,10 +124,21 @@ export function startSessionRecording(
       const match = line.match(/:(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.+)/);
       if (match) {
         const [, user, text] = match;
-        // Фильтруем боты и команды
+
+        // Непрерывное обучение: обрабатываем каждое сообщение немедленно
+        processMessageForLearning(channel, user, text);
+
+        // Фильтруем боты и команды для хранения в сессии
         if (!text.startsWith("!") && !(/https?:\/\//.test(text)) && text.length >= 2 && text.length <= 300) {
           session.messages.push({ user, text, timestamp: new Date().toISOString() });
           session.message_count++;
+
+          // Каждые 100 сообщений — flush аккумулятора в БД
+          if (session.message_count % 100 === 0) {
+            flushAccumulatorToDB(channel).catch((err) =>
+              logger.warn({ err, channel }, "Incremental learning flush failed")
+            );
+          }
         }
       }
     }
