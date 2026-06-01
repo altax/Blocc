@@ -32,6 +32,7 @@ const settingsSchema = z.object({
   bot_username: z.string().min(1, "Укажи никнейм бота"),
   twitch_oauth_token: z.string().default(""),
   twitch_client_id: z.string().default(""),
+  twitch_client_secret: z.string().default(""),
   openai_api_key: z.string().default(""),
   gemini_api_key: z.string().default(""),
   personality: z.string().min(10, "Минимум 10 символов"),
@@ -74,6 +75,7 @@ export default function Settings() {
       bot_username: "",
       twitch_oauth_token: "",
       twitch_client_id: "",
+      twitch_client_secret: "",
       openai_api_key: "",
       gemini_api_key: "",
       personality: DEFAULT_PERSONALITY,
@@ -93,6 +95,7 @@ export default function Settings() {
         bot_username: settings.bot_username ?? "",
         twitch_oauth_token: (settings as any).twitch_oauth_token ?? "",
         twitch_client_id: (settings as any).twitch_client_id ?? "",
+        twitch_client_secret: (settings as any).twitch_client_secret ?? "",
         openai_api_key: (settings as any).openai_api_key ?? "",
         gemini_api_key: (settings as any).gemini_api_key ?? "",
         personality: settings.personality || DEFAULT_PERSONALITY,
@@ -236,50 +239,79 @@ export default function Settings() {
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="twitch_client_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Twitch Client ID</FormLabel>
-                      <FormControl>
-                        <Input
-                          className="bg-black/20 font-mono"
-                          placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Из <span className="text-primary">dev.twitch.tv/console</span>. Нужен для точной проверки онлайна через Helix API.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="twitch_oauth_token"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Twitch OAuth Token</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          className="bg-black/20 font-mono"
-                          placeholder="oauth:..."
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Токен с правом <code className="text-xs bg-black/30 px-1 rounded">chat:write</code>.
-                        Получить: <span className="text-primary">twitchapps.com/tmi</span>
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="rounded-lg border border-border/40 bg-black/10 p-4 space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Twitch API (для точной проверки онлайна)</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Client ID + Client Secret → автоматически получает App Access Token. Не требует привязки к аккаунту.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="twitch_client_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Client ID</FormLabel>
+                        <FormControl>
+                          <Input
+                            className="bg-black/20 font-mono"
+                            placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Из <span className="text-primary font-medium">dev.twitch.tv/console</span>
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="twitch_client_secret"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Client Secret</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="password"
+                            className="bg-black/20 font-mono"
+                            placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Там же — кнопка "New Secret"
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
+              <FormField
+                control={form.control}
+                name="twitch_oauth_token"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Twitch OAuth Token (для чата)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        className="bg-black/20 font-mono"
+                        placeholder="oauth:..."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Токен с правом <code className="text-xs bg-black/30 px-1 rounded">chat:write</code> — нужен чтобы бот писал в чат.
+                      Получить: <span className="text-primary font-medium">twitchapps.com/tmi</span>
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </CardContent>
           </Card>
 

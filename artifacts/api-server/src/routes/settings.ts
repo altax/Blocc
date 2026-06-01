@@ -20,6 +20,7 @@ function serializeSettings(s: typeof botSettingsTable.$inferSelect) {
     bot_username: s.botUsername,
     twitch_oauth_token: s.twitchOauthToken,
     twitch_client_id: s.twitchClientId,
+    twitch_client_secret: s.twitchClientSecret,
     openai_api_key: s.openaiApiKey,
     gemini_api_key: s.geminiApiKey,
     personality: s.personality,
@@ -57,6 +58,7 @@ router.patch("/settings", async (req, res): Promise<void> => {
   if (d.bot_username !== undefined) updateData.botUsername = d.bot_username;
   if (d.twitch_oauth_token !== undefined) updateData.twitchOauthToken = d.twitch_oauth_token;
   if (d.twitch_client_id !== undefined) updateData.twitchClientId = d.twitch_client_id;
+  if (d.twitch_client_secret !== undefined) updateData.twitchClientSecret = d.twitch_client_secret;
   if (d.openai_api_key !== undefined) updateData.openaiApiKey = d.openai_api_key;
   if (d.gemini_api_key !== undefined) updateData.geminiApiKey = d.gemini_api_key;
   if (d.personality !== undefined) updateData.personality = d.personality;

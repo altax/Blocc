@@ -15,8 +15,12 @@ async function getTwitchCredentials(): Promise<TwitchCredentials | undefined> {
   try {
     const rows = await db.select().from(botSettingsTable).limit(1);
     const s = rows[0];
-    if (!s?.twitchClientId || !s?.twitchOauthToken) return undefined;
-    return { clientId: s.twitchClientId, oauthToken: s.twitchOauthToken };
+    if (!s?.twitchClientId) return undefined;
+    return {
+      clientId: s.twitchClientId,
+      clientSecret: s.twitchClientSecret || undefined,
+      oauthToken: s.twitchOauthToken || undefined,
+    };
   } catch {
     return undefined;
   }

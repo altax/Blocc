@@ -35,7 +35,10 @@
 - `dashboard/pages/settings.tsx` — новые поля `Twitch Client ID` и `Twitch OAuth Token` рядом в блоке API ключей
 - `lib/api-spec/orval.config.ts` — убран баг codegen: post-fix скрипт удаляет дублирующий `export * from './generated/types'` из index.ts
 
-**Как использовать:** Зайти в Settings → API ключи → ввести Twitch Client ID (из dev.twitch.tv/console) и OAuth Token. После сохранения проверка онлайна автоматически переключится на официальный Helix API.
+**Как использовать:**
+1. Settings → API ключи → ввести Client ID + Client Secret (из dev.twitch.tv/console)
+2. Токен автоматически запрашивается через Client Credentials flow и кэшируется в памяти
+3. Twitch OAuth Token нужен отдельно только чтобы бот писал в чат (twitchapps.com/tmi)
 
 **Без credentials:** система продолжает работать через GQL fallback (менее точный, но без дополнительной настройки).
 

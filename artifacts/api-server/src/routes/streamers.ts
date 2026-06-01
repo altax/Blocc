@@ -12,8 +12,12 @@ const router: IRouter = Router();
 async function getTwitchCredentials(): Promise<TwitchCredentials | undefined> {
   const rows = await db.select().from(botSettingsTable).limit(1);
   const s = rows[0];
-  if (!s?.twitchClientId || !s?.twitchOauthToken) return undefined;
-  return { clientId: s.twitchClientId, oauthToken: s.twitchOauthToken };
+  if (!s?.twitchClientId) return undefined;
+  return {
+    clientId: s.twitchClientId,
+    clientSecret: s.twitchClientSecret || undefined,
+    oauthToken: s.twitchOauthToken || undefined,
+  };
 }
 
 // Список всех стримеров с файлами

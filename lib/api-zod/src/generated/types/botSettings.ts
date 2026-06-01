@@ -12,6 +12,7 @@ export interface BotSettings {
   bot_username: string;
   twitch_oauth_token?: string;
   twitch_client_id?: string;
+  twitch_client_secret?: string;
   openai_api_key?: string;
   gemini_api_key?: string;
   personality: string;
