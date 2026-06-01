@@ -8,6 +8,7 @@ import patternsRouter from "./patterns";
 import statsRouter from "./stats";
 import streamersRouter from "./streamers";
 import schedulerRouter from "./scheduler";
+import sessionsRouter from "./sessions";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(patternsRouter);
 router.use(statsRouter);
 router.use(streamersRouter);
 router.use(schedulerRouter);
+router.use(sessionsRouter);
 
 export default router;

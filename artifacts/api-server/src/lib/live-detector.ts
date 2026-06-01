@@ -14,8 +14,9 @@ export interface ChannelActivity {
 /**
  * Подключается ко всем каналам одновременно через IRC.
  * Считает количество сообщений за windowMs мс.
- * Затем проверяет через Twitch GQL какую игру стримит каждый живой канал.
- * Каналы с >5 сообщений считаются живыми.
+ * Параллельно проверяет через Twitch GQL статус онлайн для ВСЕХ каналов.
+ * GQL является основным источником правды об онлайне.
+ * IRC-активность используется только как дополнительная метрика.
  */
 export async function detectLiveChannels(
   channels: string[],
@@ -56,31 +57,29 @@ export async function detectLiveChannels(
     });
   };
 
-  // Подключаемся ко всем каналам параллельно
-  await Promise.allSettled(channels.map(connectChannel));
+  // Запускаем IRC-мониторинг и GQL-проверку параллельно
+  const [, gameMap] = await Promise.all([
+    // IRC: подключаемся ко всем каналам и слушаем windowMs
+    Promise.allSettled(channels.map(connectChannel)).then(() =>
+      new Promise<void>((r) => setTimeout(r, windowMs))
+    ),
+    // GQL: проверяем онлайн-статус ВСЕХ каналов (не только с IRC-активностью)
+    batchCheckGames(channels),
+  ]);
 
-  // Ждём окно наблюдения (параллельно идёт GQL-запрос для онлайн-каналов)
-  await new Promise((r) => setTimeout(r, windowMs));
-
-  // Закрываем все сокеты
+  // Закрываем все IRC-сокеты
   for (const [, socket] of sockets) {
     try { socket.destroy(); } catch { /* ignore */ }
   }
 
   const windowMinutes = windowMs / 60_000;
 
-  // Определяем живые каналы по IRC-активности
-  const liveChannels = channels.filter((ch) => (counts.get(ch) ?? 0) >= 5);
-
-  // Параллельно запрашиваем игру для всех живых каналов через Twitch GQL
-  const gameMap = liveChannels.length > 0
-    ? await batchCheckGames(liveChannels)
-    : new Map();
-
   const results: ChannelActivity[] = channels.map((channel) => {
     const count = counts.get(channel) ?? 0;
-    const isLive = count >= 5;
     const gameInfo = gameMap.get(channel);
+
+    // GQL — основной источник правды об онлайне
+    const isLive = gameInfo?.is_live ?? false;
     const gameName = gameInfo?.game_name ?? null;
 
     return {
@@ -100,6 +99,9 @@ export async function detectLiveChannels(
     return b.message_count - a.message_count;
   });
 
-  logger.info({ results: results.map((r) => ({ ch: r.channel, live: r.is_live, cs2: r.is_cs2, game: r.game_name })) }, "Live detection complete");
+  logger.info(
+    { results: results.map((r) => ({ ch: r.channel, live: r.is_live, cs2: r.is_cs2, game: r.game_name, msgs: r.message_count })) },
+    "Live detection complete (GQL primary)"
+  );
   return results;
 }
