@@ -508,29 +508,34 @@ export default function Learning() {
   const tabPatternCount = filteredEvents.filter((e) => e.type === "pattern_new").length;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <header className="h-12 border-b border-border/50 flex items-center px-4 gap-3 shrink-0 bg-card/30">
-        <BrainCircuit className="w-4 h-4 text-primary" />
-        <h1 className="text-sm font-semibold">Обучение ИИ</h1>
-        <div className="flex items-center gap-1.5 ml-1">
+      <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
+        <div>
+          <h1 className="text-lg font-bold flex items-center gap-2">
+            <BrainCircuit className="w-4.5 h-4.5 text-primary" />
+            Обучение ИИ
+          </h1>
+          <p className="text-xs text-muted-foreground/40 mt-0.5">
+            Живой IRC → классификация → паттерны → база
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-xs font-mono">
+          {isError && <span className="text-red-400/70 border border-red-500/20 rounded px-2 py-1">API error</span>}
           {stats && stats.active_channels.length > 0 ? (
-            <>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs text-green-400">{stats.active_channels.length} канал(ов) active</span>
-            </>
+            <span className="flex items-center gap-1.5 text-emerald-400 border border-emerald-500/20 rounded-lg px-3 py-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {stats.active_channels.length} активных сессий
+            </span>
           ) : (
-            <span className="text-xs text-muted-foreground">нет активных сессий</span>
+            <span className="text-muted-foreground/30 border border-white/5 rounded-lg px-3 py-1.5">нет сессий</span>
           )}
+          <span className="text-muted-foreground/30 border border-white/5 rounded-lg px-3 py-1.5">
+            {allEvents.filter(e => e.type === "msg_classified").length.toLocaleString()} сообщ.
+            <span className="text-emerald-400 ml-2">+{allEvents.filter(e => e.type === "pattern_new").length}</span>
+          </span>
         </div>
-        {isError && (
-          <span className="text-xs text-destructive ml-2">ошибка подключения к API</span>
-        )}
-        <div className="ml-auto flex items-center gap-3 text-[11px] text-muted-foreground">
-          <span>{allEvents.filter(e => e.type === "msg_classified").length.toLocaleString()} сообщ.</span>
-          <span className="text-green-400">{allEvents.filter(e => e.type === "pattern_new").length.toLocaleString()} новых паттернов</span>
-        </div>
-      </header>
+      </div>
 
       {/* Tab bar */}
       {tabs.length > 1 && (

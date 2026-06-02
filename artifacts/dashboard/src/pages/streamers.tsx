@@ -436,71 +436,53 @@ export default function Streamers() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* ── Заголовок ─────────────────────────────────────────────────── */}
-      <div className="px-6 py-4 border-b border-border/50 flex items-center justify-between shrink-0">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-lg font-semibold flex items-center gap-2">
-            <Eye className="w-5 h-5 text-primary" />
+          <h1 className="text-lg font-bold flex items-center gap-2">
+            <Eye className="w-4.5 h-4.5 text-primary" />
             Стримеры
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Мониторинг · Запись чата · Сбор паттернов для обучения ИИ
+          <p className="text-xs text-muted-foreground/40 mt-0.5">
+            Мониторинг · Запись чата · Сбор паттернов
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Статистика */}
           {onlineResults.size > 0 && (
-            <div className="hidden sm:flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-green-400 font-medium">{cs2Channels.length} CS2</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-yellow-400" />
-                <span className="text-yellow-400">{liveChannels.length - cs2Channels.length} live</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-muted-foreground/30" />
-                <span className="text-muted-foreground">{offlineChannels.length} offline</span>
-              </div>
+            <div className="hidden sm:flex items-center gap-3 text-xs font-medium border border-white/6 rounded-lg px-3 py-1.5">
+              <span className="flex items-center gap-1.5 text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                {cs2Channels.length} CS2
+              </span>
+              <span className="text-white/10">|</span>
+              <span className="text-yellow-400">{liveChannels.length - cs2Channels.length} live</span>
+              <span className="text-white/10">|</span>
+              <span className="text-muted-foreground/40">{offlineChannels.length} offline</span>
             </div>
           )}
-
-          {/* Кнопка обновления */}
           <Button
-            size="sm"
-            variant="outline"
+            size="sm" variant="outline"
             onClick={() => { runCheck(false); discoverCS2(); }}
             disabled={checking}
-            className="gap-1.5 h-8 text-xs"
+            className="gap-1.5 h-8 text-xs border-white/8 bg-transparent hover:bg-white/5"
           >
-            {checking
-              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              : <RefreshCw className="w-3.5 h-3.5" />}
+            {checking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
             {checking ? "Проверяю..." : "Обновить"}
           </Button>
         </div>
       </div>
 
-      {/* Статус последней проверки */}
+      {/* Status bar */}
       {lastCheckedAt && (
-        <div className="px-6 py-1.5 bg-muted/20 border-b border-border/30 flex items-center gap-2 text-[11px] text-muted-foreground shrink-0">
+        <div className="px-6 py-1.5 border-b border-white/4 flex items-center gap-2 text-[11px] text-muted-foreground/40 shrink-0 font-mono" style={{ background: "rgba(255,255,255,0.01)" }}>
           <Clock className="w-3 h-3" />
-          <span>Последняя проверка: {formatAgo(lastCheckedAt.toISOString())} назад · автообновление каждые 60с</span>
+          <span>Проверено {formatAgo(lastCheckedAt.toISOString())} назад · авто каждые 60с</span>
           {activeCount > 0 && (
-            <>
-              <span className="mx-1">·</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-green-400">{activeCount} активных записей</span>
-            </>
+            <><span className="mx-1 text-white/10">|</span><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /><span className="text-emerald-400">{activeCount} записей</span></>
           )}
           {schedulerStatus?.auto_record_enabled && (
-            <>
-              <span className="mx-1">·</span>
-              <CircleDot className="w-3 h-3 text-green-400" />
-              <span className="text-green-400">Авто-запись включена</span>
-            </>
+            <><span className="mx-1 text-white/10">|</span><CircleDot className="w-3 h-3 text-emerald-400" /><span className="text-emerald-400">Авто-запись</span></>
           )}
         </div>
       )}

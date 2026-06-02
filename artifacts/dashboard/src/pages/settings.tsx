@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useGetSettings, useUpdateSettings, getGetSettingsQueryKey } from "@workspace/api-client-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,8 +11,9 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Save, Bot, Clock, Brain, Key, CheckCircle2, XCircle, Loader2, Radio, ExternalLink, Tv2 } from "lucide-react";
+import { Save, Bot, Clock, Brain, Key, CheckCircle2, XCircle, Loader2, Radio, ExternalLink, Tv2, Settings as SettingsIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_PERSONALITY = `Ты русский зритель CS2 стримов. Пишешь короткие, живые сообщения в чат как настоящий человек.
 
@@ -47,32 +47,32 @@ const settingsSchema = z.object({
   path: ["max_delay_seconds"]
 });
 
-interface VerifyResult {
-  ok: boolean;
-  error?: string;
-  live_count?: number;
-  live_channels?: string[];
+interface VerifyResult { ok: boolean; error?: string; live_count?: number; live_channels?: string[] }
+interface DeviceFlow { deviceCode: string; userCode: string; verificationUri: string; interval: number; expiresAt: number; status: "waiting" | "success" | "error"; error?: string }
+interface TokenValidation { ok: boolean; login?: string; user_id?: string; scopes?: string[]; has_chat_read?: boolean; has_chat_edit?: boolean; expires_in?: number; error?: string }
+
+function Section({ title, icon: Icon, children, className }: { title: string; icon: any; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("rounded-xl border border-white/6 bg-white/2 overflow-hidden", className)}>
+      <div className="flex items-center gap-2.5 px-5 py-4 border-b border-white/5">
+        <div className="w-7 h-7 rounded-lg bg-primary/15 flex items-center justify-center">
+          <Icon className="w-3.5 h-3.5 text-primary" />
+        </div>
+        <h2 className="font-semibold text-sm">{title}</h2>
+      </div>
+      <div className="p-5 space-y-5">{children}</div>
+    </div>
+  );
 }
 
-interface DeviceFlow {
-  deviceCode: string;
-  userCode: string;
-  verificationUri: string;
-  interval: number;
-  expiresAt: number;
-  status: "waiting" | "success" | "error";
-  error?: string;
-}
-
-interface TokenValidation {
-  ok: boolean;
-  login?: string;
-  user_id?: string;
-  scopes?: string[];
-  has_chat_read?: boolean;
-  has_chat_edit?: boolean;
-  expires_in?: number;
-  error?: string;
+function FieldRow({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[13px] font-medium text-foreground/80">{label}</label>
+      {children}
+      {description && <p className="text-[11px] text-muted-foreground/50">{description}</p>}
+    </div>
+  );
 }
 
 export default function Settings() {
@@ -86,39 +86,23 @@ export default function Settings() {
   const [tokenValidation, setTokenValidation] = useState<TokenValidation | null>(null);
   const [verifyingToken, setVerifyingToken] = useState(false);
 
-  const { data: settings, isLoading } = useGetSettings({
-    query: { queryKey: getGetSettingsQueryKey() }
-  });
-
+  const { data: settings, isLoading } = useGetSettings({ query: { queryKey: getGetSettingsQueryKey() } });
   const updateMutation = useUpdateSettings({
     mutation: {
-      onSuccess: () => {
-        toast({ title: "Настройки сохранены", description: "Конфигурация бота обновлена." });
-        queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
-      },
-      onError: (err: any) => {
-        toast({ title: "Ошибка сохранения", description: err.message || "Что-то пошло не так.", variant: "destructive" });
-      }
+      onSuccess: () => { toast({ title: "Настройки сохранены" }); queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() }); },
+      onError: (err: any) => { toast({ title: "Ошибка", description: err.message, variant: "destructive" }); }
     }
   });
 
   const form = useForm<z.infer<typeof settingsSchema>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
-      channel_name: "",
-      bot_username: "",
-      twitch_oauth_token: "",
-      twitch_client_id: "",
-      twitch_client_secret: "",
-      openai_api_key: "",
-      gemini_api_key: "",
+      channel_name: "", bot_username: "", twitch_oauth_token: "",
+      twitch_client_id: "", twitch_client_secret: "",
+      openai_api_key: "", gemini_api_key: "",
       personality: DEFAULT_PERSONALITY,
-      min_delay_seconds: 8,
-      max_delay_seconds: 35,
-      cooldown_seconds: 90,
-      respond_to_chat: true,
-      vision_enabled: true,
-      speech_enabled: true,
+      min_delay_seconds: 8, max_delay_seconds: 35, cooldown_seconds: 90,
+      respond_to_chat: true, vision_enabled: true, speech_enabled: true,
     }
   });
 
@@ -145,10 +129,7 @@ export default function Settings() {
   }, [settings, form]);
 
   const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearTimeout(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
+    if (pollTimerRef.current) { clearTimeout(pollTimerRef.current); pollTimerRef.current = null; }
   }, []);
 
   const pollDeviceFlow = useCallback((deviceCode: string, interval: number, expiresAt: number) => {
@@ -158,11 +139,7 @@ export default function Settings() {
     }
     pollTimerRef.current = setTimeout(async () => {
       try {
-        const resp = await fetch("/api/settings/twitch-device-flow/poll", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ device_code: deviceCode }),
-        });
+        const resp = await fetch("/api/settings/twitch-device-flow/poll", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ device_code: deviceCode }) });
         const data = await resp.json();
         if (data.pending) {
           pollDeviceFlow(deviceCode, interval, expiresAt);
@@ -171,7 +148,7 @@ export default function Settings() {
           setDeviceFlow(prev => prev ? { ...prev, status: "success" } : null);
           form.setValue("twitch_oauth_token", data.token);
           queryClient.invalidateQueries({ queryKey: getGetSettingsQueryKey() });
-          toast({ title: "Токен получен!", description: "OAuth токен сохранён в базе данных." });
+          toast({ title: "Токен получен!" });
         } else {
           stopPolling();
           setDeviceFlow(prev => prev ? { ...prev, status: "error", error: data.error || "Ошибка" } : null);
@@ -188,576 +165,279 @@ export default function Settings() {
     setDeviceFlow(null);
     const values = form.getValues();
     const clientId = values.twitch_client_id;
-    if (!clientId) {
-      toast({ title: "Укажи Client ID", description: "Заполни поле Client ID и сохрани настройки.", variant: "destructive" });
-      return;
-    }
-    await fetch("/api/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ twitch_client_id: clientId, twitch_client_secret: values.twitch_client_secret }),
-    });
+    if (!clientId) { toast({ title: "Укажи Client ID", variant: "destructive" }); return; }
+    await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ twitch_client_id: clientId, twitch_client_secret: values.twitch_client_secret }) });
     try {
-      const resp = await fetch("/api/settings/twitch-device-flow/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId }),
-      });
+      const resp = await fetch("/api/settings/twitch-device-flow/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: clientId }) });
       const data = await resp.json();
-      if (!data.ok) {
-        toast({ title: "Ошибка", description: data.error, variant: "destructive" });
-        return;
-      }
-      const flow: DeviceFlow = {
-        deviceCode: data.device_code,
-        userCode: data.user_code,
-        verificationUri: data.verification_uri,
-        interval: data.interval,
-        expiresAt: Date.now() + data.expires_in * 1000,
-        status: "waiting",
-      };
+      if (!data.ok) { toast({ title: "Ошибка", description: data.error, variant: "destructive" }); return; }
+      const flow: DeviceFlow = { deviceCode: data.device_code, userCode: data.user_code, verificationUri: data.verification_uri, interval: data.interval, expiresAt: Date.now() + data.expires_in * 1000, status: "waiting" };
       setDeviceFlow(flow);
       pollDeviceFlow(flow.deviceCode, flow.interval, flow.expiresAt);
-    } catch {
-      toast({ title: "Ошибка сети", variant: "destructive" });
-    }
+    } catch { toast({ title: "Ошибка сети", variant: "destructive" }); }
   };
 
   useEffect(() => () => stopPolling(), [stopPolling]);
 
-  const onSubmit = (values: z.infer<typeof settingsSchema>) => {
-    updateMutation.mutate({ data: values });
-  };
-
   const verifyOAuthToken = async () => {
-    setVerifyingToken(true);
-    setTokenValidation(null);
+    setVerifyingToken(true); setTokenValidation(null);
     try {
       const values = form.getValues();
-      if (values.twitch_oauth_token) {
-        await fetch("/api/settings", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ twitch_oauth_token: values.twitch_oauth_token }),
-        });
-      }
+      if (values.twitch_oauth_token) { await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ twitch_oauth_token: values.twitch_oauth_token }) }); }
       const resp = await fetch("/api/settings/verify-oauth-token", { method: "POST" });
-      const data = await resp.json();
-      setTokenValidation(data);
-    } catch {
-      setTokenValidation({ ok: false, error: "Ошибка сети" });
-    } finally {
-      setVerifyingToken(false);
-    }
+      setTokenValidation(await resp.json());
+    } catch { setTokenValidation({ ok: false, error: "Ошибка сети" }); }
+    finally { setVerifyingToken(false); }
   };
 
   const verifyTwitch = async () => {
-    setVerifying(true);
-    setVerifyResult(null);
+    setVerifying(true); setVerifyResult(null);
     try {
       const values = form.getValues();
-      await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          twitch_client_id: values.twitch_client_id,
-          twitch_client_secret: values.twitch_client_secret,
-        }),
-      });
+      await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ twitch_client_id: values.twitch_client_id, twitch_client_secret: values.twitch_client_secret }) });
       const resp = await fetch("/api/settings/verify-twitch", { method: "POST" });
-      const data = await resp.json();
-      setVerifyResult(data);
-    } catch {
-      setVerifyResult({ ok: false, error: "Ошибка сети" });
-    } finally {
-      setVerifying(false);
-    }
+      setVerifyResult(await resp.json());
+    } catch { setVerifyResult({ ok: false, error: "Ошибка сети" }); }
+    finally { setVerifying(false); }
   };
+
+  const onSubmit = (values: z.infer<typeof settingsSchema>) => updateMutation.mutate({ data: values });
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto w-full space-y-6">
-        <Skeleton className="h-8 w-48 mb-6" />
-        <Skeleton className="h-[400px] w-full" />
+      <div className="p-6 max-w-3xl mx-auto space-y-4">
+        <Skeleton className="h-8 w-48 bg-white/4" />
+        {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-48 bg-white/4" />)}
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto w-full pb-20">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Конфигурация</h1>
-        <p className="text-sm text-muted-foreground mt-1">Личность бота, API ключи и параметры поведения.</p>
+    <div className="flex flex-col h-full overflow-y-auto">
+      <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0">
+        <div>
+          <h1 className="text-lg font-bold flex items-center gap-2">
+            <SettingsIcon className="w-4.5 h-4.5 text-primary" />
+            Настройки
+          </h1>
+          <p className="text-xs text-muted-foreground/40 mt-0.5">Личность, API ключи, тайминги</p>
+        </div>
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 max-w-3xl mx-auto w-full space-y-5 pb-20">
 
           {/* Identity */}
-          <Card className="bg-card/50 border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg">
-                <Bot className="w-5 h-5 mr-2 text-primary" />
-                Идентификация и цель
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="bot_username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Никнейм бота (Twitch)</FormLabel>
-                      <FormControl><Input className="bg-black/20" placeholder="mybot123" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="channel_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Целевой канал</FormLabel>
-                      <FormControl><Input className="bg-black/20" placeholder="s1mple" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="personality"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Системный промпт / Личность</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        className="bg-black/20 min-h-[180px] font-mono text-xs leading-relaxed"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Основная директива, определяющая каждое решение и сообщение бота.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+          <Section title="Идентификация" icon={Bot}>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="bot_username" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-[13px] text-foreground/80">Никнейм бота</FormLabel>
+                  <FormControl><Input className="bg-black/30 border-white/8 focus:border-primary/40" placeholder="mybot123" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="channel_name" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-[13px] text-foreground/80">Целевой канал</FormLabel>
+                  <FormControl><Input className="bg-black/30 border-white/8 focus:border-primary/40" placeholder="s1mple" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+            <FormField control={form.control} name="personality" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[13px] text-foreground/80">Системный промпт / Личность</FormLabel>
+                <FormControl>
+                  <Textarea className="bg-black/30 border-white/8 focus:border-primary/40 min-h-[160px] font-mono text-[12px] leading-relaxed" {...field} />
+                </FormControl>
+                <p className="text-[11px] text-muted-foreground/40">Основная директива бота — определяет каждое сообщение</p>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </Section>
 
           {/* API Keys */}
-          <Card className="bg-card/50 border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg">
-                <Key className="w-5 h-5 mr-2 text-primary" />
-                API ключи
-              </CardTitle>
-              <CardDescription>
-                Ключи хранятся в базе данных. Оставь пустым — текущее значение не изменится.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="openai_api_key"
-                render={({ field }) => (
+          <Section title="API Ключи" icon={Key}>
+            <p className="text-[11px] text-muted-foreground/40 -mt-2">Хранятся в БД. Пустое поле — текущее значение не изменится.</p>
+            <FormField control={form.control} name="openai_api_key" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[13px] text-foreground/80">OpenAI API Key</FormLabel>
+                <FormControl><Input type="password" className="bg-black/30 border-white/8 focus:border-primary/40 font-mono" placeholder="sk-proj-..." {...field} /></FormControl>
+                <p className="text-[11px] text-muted-foreground/40">GPT-4o (генерация сообщений) + Whisper (аудио)</p>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="gemini_api_key" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[13px] text-foreground/80">Gemini API Key</FormLabel>
+                <FormControl><Input type="password" className="bg-black/30 border-white/8 focus:border-primary/40 font-mono" placeholder="AIza..." {...field} /></FormControl>
+                <p className="text-[11px] text-muted-foreground/40">Gemini 2.0 Flash — анализ видео стрима</p>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {/* Twitch API block */}
+            <div className="rounded-lg border border-white/6 bg-black/20 p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[13px] font-medium">Twitch API</p>
+                  <p className="text-[11px] text-muted-foreground/40 mt-0.5">Для проверки онлайна — App Access Token, не привязан к аккаунту</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={verifyTwitch} disabled={verifying} className="text-xs border-white/8 bg-transparent hover:bg-white/5">
+                  {verifying ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Проверяю...</> : <><Radio className="w-3 h-3 mr-1.5" />Проверить</>}
+                </Button>
+              </div>
+              {verifyResult && (
+                <div className={cn("rounded-lg px-3 py-2.5 text-xs flex items-start gap-2 border", verifyResult.ok ? "bg-emerald-950/40 border-emerald-800/30 text-emerald-300" : "bg-red-950/40 border-red-800/30 text-red-300")}>
+                  {verifyResult.ok ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" /> : <XCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />}
+                  <span>{verifyResult.ok ? `Подключено! Онлайн: ${verifyResult.live_count ?? 0}` : verifyResult.error}</span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="twitch_client_id" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>OpenAI API Key</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        className="bg-black/20 font-mono"
-                        placeholder="sk-proj-..."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>Нужен для GPT-4o (генерация сообщений) и Whisper (аудио).</FormDescription>
-                    <FormMessage />
+                    <FormLabel className="text-[12px] text-foreground/60">Client ID</FormLabel>
+                    <FormControl><Input className="bg-black/30 border-white/8 font-mono text-xs" placeholder="xxxx..." {...field} /></FormControl>
+                    <p className="text-[10px] text-muted-foreground/30">dev.twitch.tv/console</p>
                   </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="gemini_api_key"
-                render={({ field }) => (
+                )} />
+                <FormField control={form.control} name="twitch_client_secret" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Gemini API Key</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        className="bg-black/20 font-mono"
-                        placeholder="AIza..."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>Нужен для Gemini 2.0 Flash (анализ видео стрима).</FormDescription>
-                    <FormMessage />
+                    <FormLabel className="text-[12px] text-foreground/60">Client Secret</FormLabel>
+                    <FormControl><Input type="password" className="bg-black/30 border-white/8 font-mono text-xs" placeholder="xxxx..." {...field} /></FormControl>
+                    <p className="text-[10px] text-muted-foreground/30">Кнопка "New Secret"</p>
                   </FormItem>
-                )}
-              />
-              <div className="rounded-lg border border-border/40 bg-black/10 p-4 space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Twitch API (для точной проверки онлайна)</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Client ID + Client Secret → автоматически получает App Access Token. Не требует привязки к аккаунту.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={verifyTwitch}
-                    disabled={verifying}
-                    className="shrink-0 text-xs"
-                  >
-                    {verifying
-                      ? <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Проверка...</>
-                      : <><Radio className="w-3 h-3 mr-1.5" />Проверить</>}
+                )} />
+              </div>
+            </div>
+
+            {/* OAuth token */}
+            <FormField control={form.control} name="twitch_oauth_token" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[13px] text-foreground/80">Twitch OAuth Token (для чата)</FormLabel>
+                <div className="flex gap-2">
+                  <FormControl><Input type="password" className="bg-black/30 border-white/8 focus:border-primary/40 font-mono" placeholder="oauth:..." {...field} /></FormControl>
+                  <Button type="button" variant="outline" size="sm" onClick={verifyOAuthToken} disabled={verifyingToken} className="shrink-0 text-xs border-white/8 bg-transparent hover:bg-white/5">
+                    {verifyingToken ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={startDeviceFlow} disabled={deviceFlow?.status === "waiting"} className="shrink-0 text-xs border-white/8 bg-transparent hover:bg-white/5 gap-1.5">
+                    <Tv2 className="w-3 h-3" />Получить
                   </Button>
                 </div>
 
-                {verifyResult && (
-                  <div className={`rounded-md px-3 py-2 text-xs flex items-start gap-2 ${verifyResult.ok ? "bg-green-950/40 border border-green-800/40 text-green-300" : "bg-red-950/40 border border-red-800/40 text-red-300"}`}>
-                    {verifyResult.ok
-                      ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-green-400" />
-                      : <XCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />}
-                    <div>
-                      {verifyResult.ok
-                        ? <>
-                            <span className="font-medium">Подключено!</span>{" "}
-                            Helix API работает.{" "}
-                            {verifyResult.live_count !== undefined && (
-                              <>Онлайн: <span className="font-medium">{verifyResult.live_count}</span> стримеров
-                              {verifyResult.live_channels && verifyResult.live_channels.length > 0 && (
-                                <> ({verifyResult.live_channels.join(", ")})</>
-                              )}</>
-                            )}
-                          </>
-                        : <><span className="font-medium">Ошибка:</span> {verifyResult.error}</>}
-                    </div>
+                {tokenValidation && (
+                  <div className={cn("mt-2 rounded-lg px-3 py-2.5 text-xs border", tokenValidation.ok ? "bg-emerald-950/40 border-emerald-800/30 text-emerald-300" : "bg-red-950/40 border-red-800/30 text-red-300")}>
+                    {tokenValidation.ok ? <>Токен валиден · @{tokenValidation.login} · Чат: {tokenValidation.has_chat_edit ? "✓" : "✗"}</> : tokenValidation.error}
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="twitch_client_id"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client ID</FormLabel>
-                        <FormControl>
-                          <Input
-                            className="bg-black/20 font-mono"
-                            placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Из <span className="text-primary font-medium">dev.twitch.tv/console</span>
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="twitch_client_secret"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client Secret</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            className="bg-black/20 font-mono"
-                            placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Там же — кнопка "New Secret"
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-              <FormField
-                control={form.control}
-                name="twitch_oauth_token"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Twitch OAuth Token (для чата)</FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input
-                          type="password"
-                          className="bg-black/20 font-mono"
-                          placeholder="oauth:..."
-                          {...field}
-                        />
-                      </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={startDeviceFlow}
-                        disabled={deviceFlow?.status === "waiting"}
-                        className="shrink-0 text-xs gap-1.5"
-                      >
-                        <Tv2 className="w-3.5 h-3.5" />
-                        Получить токен
-                      </Button>
-                    </div>
-
-                    {deviceFlow && (
-                      <div className={`mt-2 rounded-lg border p-4 text-sm space-y-3 ${
-                        deviceFlow.status === "success"
-                          ? "bg-green-950/40 border-green-800/40"
-                          : deviceFlow.status === "error"
-                          ? "bg-red-950/40 border-red-800/40"
-                          : "bg-blue-950/30 border-blue-800/40"
-                      }`}>
-                        {deviceFlow.status === "waiting" && (
-                          <>
-                            <div className="flex items-center gap-2 text-blue-300">
-                              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                              <span className="font-medium">Ожидаем авторизацию...</span>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-2">
-                                1. Открой ссылку и войди в аккаунт бота на Twitch:
-                              </p>
-                              <a
-                                href={deviceFlow.verificationUri}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 text-primary font-medium text-xs hover:underline"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5" />
-                                {deviceFlow.verificationUri}
-                              </a>
-                            </div>
-                            <div>
-                              <p className="text-xs text-muted-foreground mb-1">2. Введи этот код:</p>
-                              <div className="inline-flex items-center bg-black/40 rounded-md px-4 py-2 border border-blue-700/50">
-                                <span className="font-mono text-xl font-bold tracking-[0.3em] text-blue-200">
-                                  {deviceFlow.userCode}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Токен запишется автоматически после подтверждения.
-                            </p>
-                          </>
-                        )}
-                        {deviceFlow.status === "success" && (
-                          <div className="flex items-center gap-2 text-green-300">
-                            <CheckCircle2 className="w-4 h-4 shrink-0" />
-                            <span className="font-medium">Токен получен и сохранён!</span>
-                          </div>
-                        )}
-                        {deviceFlow.status === "error" && (
-                          <div className="flex items-center gap-2 text-red-300">
-                            <XCircle className="w-4 h-4 shrink-0" />
-                            <span>{deviceFlow.error}</span>
-                          </div>
-                        )}
-                        {deviceFlow.status !== "waiting" && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeviceFlow(null)}
-                            className="text-xs h-7 px-2"
-                          >
-                            Закрыть
-                          </Button>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Кнопка проверки токена */}
-                    <div className="flex items-center gap-2 mt-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={verifyOAuthToken}
-                        disabled={verifyingToken}
-                        className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
-                      >
-                        {verifyingToken
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          : <CheckCircle2 className="w-3.5 h-3.5" />}
-                        Проверить токен
-                      </Button>
-                    </div>
-
-                    {tokenValidation && (
-                      <div className={`rounded-lg border p-3 text-xs space-y-1.5 ${
-                        tokenValidation.ok
-                          ? "bg-green-950/30 border-green-800/40"
-                          : "bg-red-950/30 border-red-800/40"
-                      }`}>
-                        {tokenValidation.ok ? (
-                          <>
-                            <div className="flex items-center gap-1.5 text-green-300 font-medium">
-                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                              Токен валиден · аккаунт: <span className="font-bold">{tokenValidation.login}</span>
-                            </div>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {(tokenValidation.scopes ?? []).map((scope) => (
-                                <span key={scope} className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-                                  scope === "chat:edit" || scope === "chat:read"
-                                    ? "bg-green-800/40 text-green-300"
-                                    : "bg-muted/40 text-muted-foreground"
-                                }`}>{scope}</span>
-                              ))}
-                              {(tokenValidation.scopes ?? []).length === 0 && (
-                                <span className="text-muted-foreground">нет скоупов</span>
-                              )}
-                            </div>
-                            {!tokenValidation.has_chat_edit && (
-                              <div className="flex items-center gap-1 text-yellow-400/80 mt-1">
-                                <XCircle className="w-3 h-3 shrink-0" />
-                                <span>Нет скоупа <code className="bg-black/30 px-1">chat:edit</code> — бот не сможет писать в чат</span>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-1.5 text-red-300">
-                            <XCircle className="w-3.5 h-3.5 shrink-0" />
-                            {tokenValidation.error}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <FormDescription>
-                      Токен с правом <code className="text-xs bg-black/30 px-1 rounded">chat:edit</code> — нужен чтобы бот писал в чат.
-                      Нажми «Получить токен» для автоматического получения, или вручную через{" "}
-                      <span className="text-primary font-medium">twitchapps.com/tmi</span>
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Capabilities */}
-          <Card className="bg-card/50 border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg">
-                <Brain className="w-5 h-5 mr-2 text-primary" />
-                Возможности
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {(["vision_enabled", "speech_enabled", "respond_to_chat"] as const).map((name) => {
-                const labels: Record<string, { title: string; desc: string }> = {
-                  vision_enabled: { title: "Компьютерное зрение", desc: "Анализ скриншотов стрима через Gemini." },
-                  speech_enabled: { title: "Распознавание речи", desc: "Транскрипция аудио стримера через Whisper." },
-                  respond_to_chat: { title: "Взаимодействие с чатом", desc: "Чтение и ответы другим пользователям." },
-                };
-                return (
-                  <FormField
-                    key={name}
-                    control={form.control}
-                    name={name}
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border/50 p-4 bg-black/10">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">{labels[name].title}</FormLabel>
-                          <FormDescription>{labels[name].desc}</FormDescription>
+                {deviceFlow && (
+                  <div className={cn("mt-2 rounded-lg border p-4 space-y-3",
+                    deviceFlow.status === "success" ? "bg-emerald-950/40 border-emerald-800/30" :
+                    deviceFlow.status === "error" ? "bg-red-950/40 border-red-800/30" : "bg-blue-950/30 border-blue-800/30"
+                  )}>
+                    {deviceFlow.status === "waiting" && (
+                      <>
+                        <div className="flex items-center gap-2 text-blue-300 text-sm">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="font-medium">Ожидаем авторизацию...</span>
                         </div>
-                        <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                      </FormItem>
+                        <div className="space-y-2 text-xs">
+                          <p className="text-muted-foreground">1. Открой ссылку, войди в аккаунт бота:</p>
+                          <a href={deviceFlow.verificationUri} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-primary hover:underline font-medium">
+                            <ExternalLink className="w-3 h-3" />{deviceFlow.verificationUri}
+                          </a>
+                          <p className="text-muted-foreground">2. Введи код:</p>
+                          <div className="font-mono text-2xl font-bold tracking-[0.3em] text-white bg-black/30 rounded-lg py-3 text-center border border-white/10">
+                            {deviceFlow.userCode}
+                          </div>
+                        </div>
+                      </>
                     )}
-                  />
-                );
-              })}
-            </CardContent>
-          </Card>
+                    {deviceFlow.status === "success" && (
+                      <div className="flex items-center gap-2 text-emerald-300 text-sm">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span className="font-medium">Токен получен и сохранён!</span>
+                      </div>
+                    )}
+                    {deviceFlow.status === "error" && (
+                      <div className="text-red-300 text-sm">
+                        <XCircle className="w-4 h-4 inline mr-2" />{deviceFlow.error}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <FormMessage />
+              </FormItem>
+            )} />
+          </Section>
 
           {/* Timing */}
-          <Card className="bg-card/50 border-border/50">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg">
-                <Clock className="w-5 h-5 mr-2 text-primary" />
-                Тайминги и ритм
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-8">
-                <FormField
-                  control={form.control}
-                  name="min_delay_seconds"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex justify-between">
-                        <span>Мин. задержка</span>
-                        <span className="text-muted-foreground font-mono">{field.value}с</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Slider min={1} max={60} step={1} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="max_delay_seconds"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex justify-between">
-                        <span>Макс. задержка</span>
-                        <span className="text-muted-foreground font-mono">{field.value}с</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Slider min={2} max={120} step={1} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={form.control}
-                name="cooldown_seconds"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex justify-between">
-                      <span>Кулдаун между сообщениями</span>
-                      <span className="text-muted-foreground font-mono">{field.value}с</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Slider min={0} max={600} step={10} value={[field.value]} onValueChange={(v) => field.onChange(v[0])} />
-                    </FormControl>
-                    <FormDescription>
-                      Обязательная пауза после отправки сообщения. Рекомендую 60–120с для антидетекта.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-            <CardFooter className="bg-black/10 border-t border-border/50 py-4 flex justify-end">
-              <Button type="submit" disabled={updateMutation.isPending} className="min-w-[140px]">
-                {updateMutation.isPending ? "Сохранение..." : <><Save className="w-4 h-4 mr-2" />Сохранить</>}
-              </Button>
-            </CardFooter>
-          </Card>
+          <Section title="Тайминги" icon={Clock}>
+            <FormField control={form.control} name="min_delay_seconds" render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between mb-2">
+                  <FormLabel className="text-[13px] text-foreground/80">Минимальная задержка</FormLabel>
+                  <span className="text-sm font-mono font-bold text-primary">{field.value}с</span>
+                </div>
+                <FormControl>
+                  <Slider min={1} max={60} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} className="w-full" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="max_delay_seconds" render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between mb-2">
+                  <FormLabel className="text-[13px] text-foreground/80">Максимальная задержка</FormLabel>
+                  <span className="text-sm font-mono font-bold text-primary">{field.value}с</span>
+                </div>
+                <FormControl>
+                  <Slider min={2} max={120} step={1} value={[field.value]} onValueChange={([v]) => field.onChange(v)} className="w-full" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="cooldown_seconds" render={({ field }) => (
+              <FormItem>
+                <div className="flex items-center justify-between mb-2">
+                  <FormLabel className="text-[13px] text-foreground/80">Кулдаун после сообщения</FormLabel>
+                  <span className="text-sm font-mono font-bold text-primary">{field.value}с</span>
+                </div>
+                <FormControl>
+                  <Slider min={0} max={600} step={5} value={[field.value]} onValueChange={([v]) => field.onChange(v)} className="w-full" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </Section>
 
+          {/* Features */}
+          <Section title="Возможности" icon={Brain}>
+            {([
+              { name: "respond_to_chat" as const, label: "Реагировать на чат", desc: "Бот отвечает на упоминания и вопросы" },
+              { name: "vision_enabled" as const, label: "Анализ видео (Vision)", desc: "Gemini анализирует скриншот стрима каждые 30с" },
+              { name: "speech_enabled" as const, label: "Анализ речи (Whisper)", desc: "OpenAI Whisper распознаёт аудио стримера" },
+            ] as const).map(({ name, label, desc }) => (
+              <FormField key={name} control={form.control} name={name} render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-lg border border-white/6 bg-black/20 px-4 py-3.5">
+                  <div>
+                    <FormLabel className="text-[13px] font-medium cursor-pointer">{label}</FormLabel>
+                    <p className="text-[11px] text-muted-foreground/40 mt-0.5">{desc}</p>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )} />
+            ))}
+          </Section>
+
+          {/* Save */}
+          <Button type="submit" className="w-full h-11 font-semibold" disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Сохраняем...</> : <><Save className="w-4 h-4 mr-2" />Сохранить настройки</>}
+          </Button>
         </form>
       </Form>
     </div>
