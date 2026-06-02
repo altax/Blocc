@@ -274,7 +274,44 @@ async function sendMessage(
 }
 
 /**
- * Классификация речи стримера
+ * Определяет направлена ли речь стримера к зрителям или это внутриигровой каллаут.
+ *
+ * CS2-стримеры постоянно говорят в игру: "флеш лонг", "двое на б", "снайпер шорт".
+ * Эти каллауты НЕ должны попадать в контекст бота как "речь стримера к чату" —
+ * они не обращены к зрителям и не несут информации для реакции.
+ *
+ * Однако updateGameState() всё равно вызывается — каллауты полезны для игрового состояния.
+ */
+function detectSpeechIntent(text: string): "chat" | "ingame" | "ambiguous" {
+  const lower = text.toLowerCase().trim();
+  const wordCount = lower.split(/\s+/).filter((w) => w.length > 0).length;
+
+  // Явные сигналы обращения к зрителям
+  if (/\b(чат|привет|смотрите|ребят|друзья|зрители|подписчики|спасибо|спс|донат|кстати|кста|вы видели|расскажу|давайте|что думаете|кто думает|войс|диско|бустани|лайк)\b/i.test(lower)) {
+    return "chat";
+  }
+
+  // Игровые позиции CS2
+  const hasPosition = /\b(лонг|шорт|мид|тоннель|хэд|окно|балкон|банан|яма|арки|санни|a.?сайт|b.?сайт|a\s*site|b\s*site|short|long|mid|ramp|catwalk|pit|van|ван|боксы|коридор)\b/i.test(lower);
+  // Тактические команды команде
+  const hasTactics = /\b(флеш|flash|смок|smoke|пуш|push|ротируй|rotate|форс|force|сейв|save|удерживай|hold|плант|plant|дефуз|defuse|расчисти|clear|фланг|flank|прикрой|cover|дроп|drop|пик|peek)\b/i.test(lower);
+  // Информация о противниках
+  const hasEnemyInfo = /\b(один остал|двое|трое|четверо|снайпер|awp|вижу\s|слышу|шаги|он там|они там|за углом|последний|ещё один|их двое|их трое)\b/i.test(lower);
+
+  const hasIngameSignal = hasPosition || hasTactics || hasEnemyInfo;
+
+  // Короткий + игровые термины → почти точно каллаут в игру
+  if (hasIngameSignal && wordCount <= 6) return "ingame";
+
+  // Длинные фразы без игровых сигналов → скорее чат
+  if (wordCount >= 7 && !hasIngameSignal) return "chat";
+
+  return "ambiguous";
+}
+
+/**
+ * Классификация речи стримера ОБРАЩЁННОЙ К ЧАТУ.
+ * Вызывается только если detectSpeechIntent != "ingame".
  */
 function classifySpeech(text: string): void {
   const lower = text.toLowerCase();
@@ -401,12 +438,23 @@ export async function stopBot(): Promise<void> {
 
 /**
  * Публичный API для speech (вызывается из routes при STT)
+ *
+ * Важно: updateGameState вызывается всегда — каллауты ("флеш лонг", "двое на б")
+ * полезны для извлечения game state. Но в контекст бота как "речь стримера"
+ * попадает ТОЛЬКО речь обращённая к зрителям, не внутриигровые переговоры.
  */
 export function onSpeechTranscript(text: string): void {
-  classifySpeech(text);
+  const intent = detectSpeechIntent(text);
+
+  // Game state обновляем из любой речи (включая каллауты)
   const gs = updateGameState(text);
 
-  // Narrative: записываем CS2 события из речи
+  // В промпт-контекст и session memory — только речь к зрителям
+  if (intent !== "ingame") {
+    classifySpeech(text);
+  }
+
+  // Narrative: CS2 игровые моменты из речи (независимо от intent)
   if (gs.momentType !== "normal" && gs.momentIntensity >= 4) {
     addNarrativeEvent("game_moment", `${gs.momentType} (речь)`, gs.momentIntensity);
   }

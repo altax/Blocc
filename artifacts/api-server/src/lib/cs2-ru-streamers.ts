@@ -19,6 +19,8 @@ export const RU_CS2_STREAMERS: StreamerPreset[] = [
   { channel: "s1mple",       displayName: "s1mple",       description: "Легенда CS2, огромный рус. чат",       category: "pro",           priority: 3 },
   { channel: "rekrent",      displayName: "Recrent",      description: "Топ рус. CS2 развлекательный стример", category: "entertainment", priority: 1 },
   { channel: "m0nesy",       displayName: "m0nesy",       description: "G2 CS2 игрок, рус. аудитория",         category: "pro",           priority: 3 },
+  { channel: "m3wsu",        displayName: "m3wsu",        description: "Рус. CS2 стример",                     category: "entertainment", priority: 2 },
+  { channel: "baz1221",      displayName: "baz1221",      description: "Рус. CS2 стример",                     category: "entertainment", priority: 2 },
 ];
 
 export function getPresetChannels(minPriority = 3): string[] {

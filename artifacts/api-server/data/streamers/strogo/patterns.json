@@ -1,0 +1,14 @@
+{
+  "channel": "strogo",
+  "collected_at": "2026-06-02T09:03:31.677Z",
+  "total_patterns": 1,
+  "patterns": [
+    {
+      "content": "jboy42D",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    }
+  ]
+}

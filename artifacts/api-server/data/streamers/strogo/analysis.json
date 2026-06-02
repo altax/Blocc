@@ -1,0 +1,37 @@
+{
+  "channel": "strogo",
+  "analyzed_at": "2026-06-02T09:03:31.678Z",
+  "stats": {
+    "total_messages": 1,
+    "unique_phrases": 1,
+    "ru_ratio": 0,
+    "en_ratio": 100,
+    "mixed_ratio": 0,
+    "cs2_ratio": 0,
+    "avg_message_length": 7,
+    "top_pattern_types": [
+      {
+        "type": "game_specific",
+        "count": 1,
+        "percent": 100
+      }
+    ]
+  },
+  "top_phrases": [
+    {
+      "content": "jboy42D",
+      "type": "game_specific",
+      "frequency": 1,
+      "language": "en",
+      "game": "other"
+    }
+  ],
+  "sample_messages": [
+    "jboy42D"
+  ],
+  "style_notes": [
+    "Чат преимущественно на английском",
+    "Чат не очень CS2-специфичен, больше эмоций/мемов",
+    "Короткие сообщения — быстрые реакции, эмоуты"
+  ]
+}
