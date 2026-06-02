@@ -3,6 +3,9 @@ import { db } from "@workspace/db";
 import { botMessagesTable, chatPatternsTable, botReflectionsTable, botSettingsTable } from "@workspace/db";
 import { desc, isNotNull, avg, sql, gte, count } from "drizzle-orm";
 import { runReflection } from "../lib/bot-engine/reflection-engine";
+import { getGameState } from "../lib/bot-engine/game-state-machine";
+import { getHypeState } from "../lib/bot-engine/chat-hype-detector";
+import { getSession } from "../lib/bot-engine/session-memory";
 
 const router: IRouter = Router();
 
@@ -175,6 +178,55 @@ router.get("/intelligence/messages-per-day", async (req, res): Promise<void> => 
       ORDER BY date ASC
     `);
     res.json(rows.rows ?? rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+/**
+ * Реальное время: game state, hype level, session memory.
+ * Опрашивается каждые 3 секунды с дашборда для live индикаторов.
+ */
+router.get("/intelligence/live", async (req, res): Promise<void> => {
+  try {
+    const gs = getGameState();
+    const hs = getHypeState();
+    const session = getSession();
+
+    res.json({
+      game_state: {
+        round_phase: gs.roundPhase,
+        moment_type: gs.momentType,
+        moment_intensity: gs.momentIntensity,
+        session_mood: gs.sessionMood,
+        ct_score: gs.ctScore,
+        t_score: gs.tScore,
+        map: gs.map ?? null,
+        is_clutch: gs.isClutch,
+        bomb_planted: gs.isBombPlanted,
+        consecutive_losses: gs.consecutiveLosses,
+        consecutive_wins: gs.consecutiveWins,
+        last_event: gs.lastEventDescription,
+      },
+      hype: {
+        level: hs.currentLevel,
+        is_hot: hs.isHot,
+        velocity: hs.chatVelocity,
+        dominant_topic: hs.dominantTopic,
+        recent_event_types: hs.recentEvents.slice(-3).map((e) => e.type),
+      },
+      session: session ? {
+        channel: session.channel,
+        duration_minutes: Math.floor((Date.now() - session.startedAt) / 60_000),
+        messages_sent: session.messagesSent,
+        avg_quality: session.avgQualityScore,
+        bot_mood: session.botMood,
+        chat_personality: session.chatPersonality,
+        notable_moments_count: session.notableMoments.length,
+        top_messages: session.topMessages.slice(0, 3),
+        effective_pattern_types: session.effectivePatternTypes,
+      } : null,
+    });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }

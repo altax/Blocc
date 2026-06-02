@@ -12,7 +12,8 @@ import {
 } from "recharts";
 import {
   Activity, MessageSquareText, Hash, BrainCircuit, Sparkles,
-  TrendingUp, Zap, RefreshCw, Star, Clock, Radio,
+  TrendingUp, Zap, RefreshCw, Star, Clock, Radio, Flame,
+  Swords, AlertTriangle, Target, Wifi, ThumbsUp,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -40,13 +41,34 @@ interface Reflection {
   triggeredBy: string; createdAt: string;
 }
 
+interface LiveIntelligence {
+  game_state: {
+    round_phase: string; moment_type: string; moment_intensity: number;
+    session_mood: string; ct_score: number; t_score: number;
+    map: string | null; is_clutch: boolean; bomb_planted: boolean;
+    consecutive_losses: number; consecutive_wins: number; last_event: string;
+  };
+  hype: {
+    level: number; is_hot: boolean; velocity: number;
+    dominant_topic: string | null; recent_event_types: string[];
+  };
+  session: {
+    channel: string; duration_minutes: number; messages_sent: number;
+    avg_quality: number; bot_mood: string; chat_personality: string;
+    notable_moments_count: number;
+    top_messages: { message: string; quality: number }[];
+    effective_pattern_types: string[];
+  } | null;
+}
+
 function useIntelligence() {
   const metrics = useQuery<IntelligenceMetrics>({ queryKey: ["intelligence/metrics"], queryFn: () => fetch(`${API}/intelligence/metrics`).then(r => r.json()), refetchInterval: 15000 });
   const trend = useQuery<QualityPoint[]>({ queryKey: ["intelligence/quality-trend"], queryFn: () => fetch(`${API}/intelligence/quality-trend?limit=60`).then(r => r.json()), refetchInterval: 15000 });
   const dna = useQuery<DNA>({ queryKey: ["intelligence/dna"], queryFn: () => fetch(`${API}/intelligence/dna`).then(r => r.json()), refetchInterval: 20000 });
   const reflections = useQuery<Reflection[]>({ queryKey: ["intelligence/reflections"], queryFn: () => fetch(`${API}/intelligence/reflections?limit=5`).then(r => r.json()), refetchInterval: 30000 });
   const perDay = useQuery<DayStats[]>({ queryKey: ["intelligence/messages-per-day"], queryFn: () => fetch(`${API}/intelligence/messages-per-day`).then(r => r.json()), refetchInterval: 60000 });
-  return { metrics, trend, dna, reflections, perDay };
+  const live = useQuery<LiveIntelligence>({ queryKey: ["intelligence/live"], queryFn: () => fetch(`${API}/intelligence/live`).then(r => r.json()), refetchInterval: 3000 });
+  return { metrics, trend, dna, reflections, perDay, live };
 }
 
 function scoreColor(s: number | null | undefined) {
@@ -100,11 +122,251 @@ function DayTooltip({ active, payload, label }: any) {
   );
 }
 
+const MOMENT_LABELS: Record<string, string> = {
+  ace: "🎯 ЭЙС", clutch: "🔥 КЛАТЧ", bomb_planted: "💣 БОМБА", bomb_defused: "✅ ДЕФУЗ",
+  knife_kill: "🗡️ НОЖИК", headshot_streak: "🎯 ХЕДШОТ", death: "💀 СМЕРТЬ",
+  eco_win: "💰 ЭКО WIN", pistol_round: "🔫 ПИСТОЛЬ", awp_highlight: "🎯 AWP", win: "🏆 ПОБЕДА",
+  loss: "❌ ПОРАЖЕНИЕ", normal: "▶ ОБЫЧНО",
+};
+
+const MOOD_LABELS: Record<string, { label: string; color: string }> = {
+  hyped: { label: "ХАЙП", color: "text-emerald-400" },
+  tense: { label: "НАПРЯЖЕНИЕ", color: "text-yellow-400" },
+  tilted: { label: "ТИЛТ", color: "text-red-400" },
+  chill: { label: "СПОКОЙНО", color: "text-blue-400" },
+  comeback: { label: "КАМБЭК!", color: "text-purple-400" },
+  stomp: { label: "ДОМИНАЦИЯ", color: "text-emerald-400" },
+};
+
+const BOT_MOOD_LABELS: Record<string, { label: string; color: string }> = {
+  hyped: { label: "Кайфует", color: "text-emerald-400" },
+  tense: { label: "Напряжён", color: "text-yellow-400" },
+  tilted: { label: "На тилте", color: "text-red-400" },
+  chill: { label: "Спокоен", color: "text-blue-400" },
+  supportive: { label: "Поддерживает", color: "text-purple-400" },
+};
+
+function LiveIntelligencePanel({ live }: { live: LiveIntelligence }) {
+  const gs = live.game_state;
+  const hs = live.hype;
+  const session = live.session;
+
+  const hypeColor = hs.level >= 8 ? "text-red-400" : hs.level >= 6 ? "text-orange-400" : hs.level >= 4 ? "text-yellow-400" : "text-muted-foreground/40";
+  const hypeBgColor = hs.level >= 8 ? "bg-red-500" : hs.level >= 6 ? "bg-orange-500" : hs.level >= 4 ? "bg-yellow-500" : "bg-white/20";
+  const intensityColor = gs.moment_intensity >= 8 ? "text-red-400" : gs.moment_intensity >= 6 ? "text-orange-400" : gs.moment_intensity >= 4 ? "text-yellow-400" : "text-muted-foreground/50";
+  const moodInfo = MOOD_LABELS[gs.session_mood] ?? { label: gs.session_mood, color: "text-muted-foreground/50" };
+
+  return (
+    <div className="rounded-xl border border-white/6 bg-white/2 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Wifi className="w-4 h-4 text-emerald-400" />
+            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+          <span className="text-sm font-semibold">Live Intelligence</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {gs.bomb_planted && (
+            <span className="text-[10px] font-bold text-red-400 border border-red-500/30 bg-red-500/10 rounded px-2 py-0.5 animate-pulse">
+              💣 БОМБА ЗАЛОЖЕНА
+            </span>
+          )}
+          {gs.is_clutch && (
+            <span className="text-[10px] font-bold text-orange-400 border border-orange-500/30 bg-orange-500/10 rounded px-2 py-0.5">
+              🔥 КЛАТЧ
+            </span>
+          )}
+          <span className="text-[10px] text-muted-foreground/30 font-mono">обновление каждые 3с</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 divide-x divide-white/5">
+
+        {/* CS2 Game State */}
+        <div className="p-4 space-y-3">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-2">
+            <Swords className="w-3 h-3" /> CS2 Состояние
+          </div>
+
+          {/* Moment */}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground/50">Момент</span>
+            <span className="text-xs font-bold font-mono">{MOMENT_LABELS[gs.moment_type] ?? gs.moment_type}</span>
+          </div>
+
+          {/* Intensity bar */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] text-muted-foreground/50">Интенсивность</span>
+              <span className={cn("text-xs font-bold font-mono", intensityColor)}>{gs.moment_intensity}/10</span>
+            </div>
+            <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className={cn("h-full rounded-full transition-all duration-500", gs.moment_intensity >= 8 ? "bg-red-400" : gs.moment_intensity >= 6 ? "bg-orange-400" : gs.moment_intensity >= 4 ? "bg-yellow-400" : "bg-white/20")}
+                style={{ width: `${gs.moment_intensity * 10}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Score + Map */}
+          {(gs.ct_score > 0 || gs.t_score > 0) && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground/50">Счёт</span>
+              <span className="text-xs font-bold font-mono">
+                <span className="text-sky-400">CT {gs.ct_score}</span>
+                <span className="text-muted-foreground/30 mx-1">—</span>
+                <span className="text-orange-400">{gs.t_score} T</span>
+              </span>
+            </div>
+          )}
+          {gs.map && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground/50">Карта</span>
+              <span className="text-xs font-mono text-foreground/70">{gs.map}</span>
+            </div>
+          )}
+
+          {/* Win/loss streak */}
+          {gs.consecutive_losses >= 2 && (
+            <div className="flex items-center gap-1.5 text-red-400/80 text-[11px]">
+              <AlertTriangle className="w-3 h-3" />
+              {gs.consecutive_losses} поражений подряд
+            </div>
+          )}
+          {gs.consecutive_wins >= 2 && (
+            <div className="flex items-center gap-1.5 text-emerald-400/80 text-[11px]">
+              <ThumbsUp className="w-3 h-3" />
+              {gs.consecutive_wins} побед подряд
+            </div>
+          )}
+
+          {/* Session mood */}
+          <div className="flex items-center justify-between pt-1 border-t border-white/5">
+            <span className="text-[11px] text-muted-foreground/50">Атмосфера</span>
+            <span className={cn("text-[11px] font-bold", moodInfo.color)}>{moodInfo.label}</span>
+          </div>
+        </div>
+
+        {/* Chat Hype */}
+        <div className="p-4 space-y-3">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-2">
+            <Flame className="w-3 h-3" /> Хайп чата
+          </div>
+
+          {/* Big hype number */}
+          <div className="flex items-end gap-2">
+            <span className={cn("text-4xl font-bold font-mono leading-none", hypeColor)}>{hs.level}</span>
+            <span className="text-muted-foreground/30 text-sm mb-1">/10</span>
+            {hs.is_hot && (
+              <span className="mb-1 text-[10px] font-bold text-red-400 border border-red-500/25 bg-red-500/10 rounded px-1.5 py-0.5 animate-pulse">HOT</span>
+            )}
+          </div>
+
+          {/* Hype bar */}
+          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all duration-500", hypeBgColor, hs.is_hot && "animate-pulse")}
+              style={{ width: `${hs.level * 10}%` }}
+            />
+          </div>
+
+          {/* Velocity */}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground/50">Активность</span>
+            <span className="text-xs font-mono text-foreground/60">{hs.velocity} msg/sec</span>
+          </div>
+
+          {/* Dominant topic */}
+          {hs.dominant_topic && (
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-muted-foreground/50">Тема</span>
+              <span className="text-xs font-mono text-primary/80">"{hs.dominant_topic}"</span>
+            </div>
+          )}
+
+          {/* Recent hype events */}
+          {hs.recent_event_types.length > 0 && (
+            <div className="pt-2 border-t border-white/5">
+              <div className="text-[10px] text-muted-foreground/30 mb-1.5">Недавние события</div>
+              <div className="flex flex-wrap gap-1">
+                {hs.recent_event_types.map((t, i) => (
+                  <span key={i} className="text-[10px] border border-white/8 rounded px-1.5 py-0.5 text-muted-foreground/50">
+                    {t.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Session Memory */}
+        <div className="p-4 space-y-3">
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/40 font-medium mb-2">
+            <Target className="w-3 h-3" /> Сессия
+          </div>
+
+          {session ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground/50">Длительность</span>
+                <span className="text-xs font-mono text-foreground/70">{session.duration_minutes} мин</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground/50">Отправлено</span>
+                <span className="text-xs font-bold font-mono text-primary">{session.messages_sent}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground/50">Ср. качество</span>
+                <span className={cn("text-xs font-bold font-mono", scoreColor(session.avg_quality))}>{session.avg_quality}/100</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground/50">Настроение</span>
+                <span className={cn("text-xs font-bold", BOT_MOOD_LABELS[session.bot_mood]?.color ?? "text-muted-foreground/50")}>
+                  {BOT_MOOD_LABELS[session.bot_mood]?.label ?? session.bot_mood}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted-foreground/50">Чат</span>
+                <span className="text-xs text-foreground/60">{session.chat_personality}</span>
+              </div>
+              {session.notable_moments_count > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-muted-foreground/50">Моментов</span>
+                  <span className="text-xs font-mono text-foreground/60">{session.notable_moments_count}</span>
+                </div>
+              )}
+              {session.top_messages.length > 0 && (
+                <div className="pt-2 border-t border-white/5">
+                  <div className="text-[10px] text-muted-foreground/30 mb-1.5">Лучшие сообщения</div>
+                  {session.top_messages.map((m, i) => (
+                    <div key={i} className="flex items-center gap-1.5 text-[11px] mb-1">
+                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", scoreDotColor(m.quality))} />
+                      <span className="text-foreground/60 truncate italic">"{m.message}"</span>
+                      <span className={cn("shrink-0 font-mono font-bold text-[10px]", scoreColor(m.quality))}>{m.quality}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+              <Target className="w-6 h-6 opacity-15" />
+              <p className="text-xs text-muted-foreground/30">Сессия не активна</p>
+              <p className="text-[11px] text-muted-foreground/20">Запусти бота чтобы видеть данные</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { data: status } = useGetBotStatus({ query: { queryKey: getGetBotStatusQueryKey(), refetchInterval: 3000 } });
   const { data: stats } = useGetStats({ query: { queryKey: getGetStatsQueryKey(), refetchInterval: 5000 } });
   const { data: messages } = useGetMessages({ limit: 8 }, { query: { queryKey: getGetMessagesQueryKey({ limit: 8 }), refetchInterval: 4000 } });
-  const { metrics, trend, dna, reflections, perDay } = useIntelligence();
+  const { metrics, trend, dna, reflections, perDay, live } = useIntelligence();
 
   const [reflecting, setReflecting] = useState(false);
 
@@ -201,6 +463,16 @@ export default function Dashboard() {
             sub="Текущая сессия"
           />
         </div>
+
+        {/* Live Intelligence — NEW */}
+        {live.data ? (
+          <LiveIntelligencePanel live={live.data} />
+        ) : (
+          <div className="rounded-xl border border-white/5 bg-white/1 p-4 flex items-center gap-3 text-xs text-muted-foreground/30">
+            <Wifi className="w-4 h-4" />
+            Загрузка Live Intelligence...
+          </div>
+        )}
 
         {/* Main grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
