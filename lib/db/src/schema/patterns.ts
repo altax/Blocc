@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, real, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,6 +10,9 @@ export const chatPatternsTable = pgTable("chat_patterns", {
   frequency: integer("frequency").notNull().default(1),
   language: text("language").notNull().default("ru"),
   game: text("game").notNull().default("cs2"),
+  qualityScore: real("quality_score").notNull().default(50),
+  effectivenessCount: integer("effectiveness_count").notNull().default(0),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

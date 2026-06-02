@@ -1,0 +1,183 @@
+import { Router, type IRouter } from "express";
+import { db } from "@workspace/db";
+import { botMessagesTable, chatPatternsTable, botReflectionsTable, botSettingsTable } from "@workspace/db";
+import { desc, isNotNull, avg, sql, gte, count } from "drizzle-orm";
+import { runReflection } from "../lib/bot-engine/reflection-engine";
+
+const router: IRouter = Router();
+
+router.get("/intelligence/metrics", async (req, res): Promise<void> => {
+  try {
+    const [totalMsgs] = await db.select({ count: count() }).from(botMessagesTable);
+    const [scoredMsgs] = await db.select({ count: count() }).from(botMessagesTable).where(isNotNull(botMessagesTable.qualityScore));
+    const [avgQuality] = await db.select({ avg: avg(botMessagesTable.qualityScore) }).from(botMessagesTable).where(isNotNull(botMessagesTable.qualityScore));
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [avgQualityWeek] = await db
+      .select({ avg: avg(botMessagesTable.qualityScore) })
+      .from(botMessagesTable)
+      .where(gte(botMessagesTable.createdAt, sevenDaysAgo));
+
+    const [totalPatterns] = await db.select({ count: count() }).from(chatPatternsTable);
+    const [avgPatternQuality] = await db.select({ avg: avg(chatPatternsTable.qualityScore) }).from(chatPatternsTable);
+
+    const topPatterns = await db
+      .select({
+        content: chatPatternsTable.content,
+        qualityScore: chatPatternsTable.qualityScore,
+        frequency: chatPatternsTable.frequency,
+        patternType: chatPatternsTable.patternType,
+        effectivenessCount: chatPatternsTable.effectivenessCount,
+      })
+      .from(chatPatternsTable)
+      .orderBy(desc(sql`quality_score * LN(frequency + 1)`))
+      .limit(10);
+
+    const worstPatterns = await db
+      .select({
+        content: chatPatternsTable.content,
+        qualityScore: chatPatternsTable.qualityScore,
+        frequency: chatPatternsTable.frequency,
+      })
+      .from(chatPatternsTable)
+      .orderBy(chatPatternsTable.qualityScore)
+      .limit(5);
+
+    const [reflectionsCount] = await db.select({ count: count() }).from(botReflectionsTable);
+
+    res.json({
+      total_messages: Number(totalMsgs?.count ?? 0),
+      scored_messages: Number(scoredMsgs?.count ?? 0),
+      avg_quality: avgQuality?.avg ? Math.round(Number(avgQuality.avg) * 10) / 10 : null,
+      avg_quality_week: avgQualityWeek?.avg ? Math.round(Number(avgQualityWeek.avg) * 10) / 10 : null,
+      total_patterns: Number(totalPatterns?.count ?? 0),
+      avg_pattern_quality: avgPatternQuality?.avg ? Math.round(Number(avgPatternQuality.avg) * 10) / 10 : null,
+      top_patterns: topPatterns,
+      worst_patterns: worstPatterns,
+      total_reflections: Number(reflectionsCount?.count ?? 0),
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.get("/intelligence/quality-trend", async (req, res): Promise<void> => {
+  try {
+    const limit = Math.min(100, Number(req.query.limit) || 50);
+    const rows = await db
+      .select({
+        id: botMessagesTable.id,
+        message: botMessagesTable.message,
+        qualityScore: botMessagesTable.qualityScore,
+        qualityBreakdown: botMessagesTable.qualityBreakdown,
+        triggerType: botMessagesTable.triggerType,
+        createdAt: botMessagesTable.createdAt,
+      })
+      .from(botMessagesTable)
+      .where(isNotNull(botMessagesTable.qualityScore))
+      .orderBy(botMessagesTable.createdAt)
+      .limit(limit);
+
+    res.json(rows.map((r) => ({
+      ...r,
+      qualityBreakdown: r.qualityBreakdown ? JSON.parse(r.qualityBreakdown) : null,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.get("/intelligence/reflections", async (req, res): Promise<void> => {
+  try {
+    const limit = Math.min(50, Number(req.query.limit) || 10);
+    const rows = await db
+      .select()
+      .from(botReflectionsTable)
+      .orderBy(desc(botReflectionsTable.createdAt))
+      .limit(limit);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.post("/intelligence/reflect", async (req, res): Promise<void> => {
+  try {
+    const settingsRows = await db.select().from(botSettingsTable).limit(1);
+    const settings = settingsRows[0];
+    if (!settings?.openaiApiKey && !settings?.geminiApiKey) {
+      res.status(400).json({ error: "Нет API ключей в настройках" });
+      return;
+    }
+    const result = await runReflection(settings.openaiApiKey, settings.geminiApiKey || undefined, "manual");
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.get("/intelligence/dna", async (req, res): Promise<void> => {
+  try {
+    const recentMessages = await db
+      .select({ message: botMessagesTable.message, qualityBreakdown: botMessagesTable.qualityBreakdown })
+      .from(botMessagesTable)
+      .where(isNotNull(botMessagesTable.qualityScore))
+      .orderBy(desc(botMessagesTable.createdAt))
+      .limit(50);
+
+    if (recentMessages.length === 0) {
+      res.json({ naturalness: 50, contextFit: 50, styleMatch: 50, brevity: 50, overall: 50, sampleSize: 0 });
+      return;
+    }
+
+    let n = 0, cf = 0, sm = 0, br = 0, ov = 0, count = 0;
+    for (const row of recentMessages) {
+      if (!row.qualityBreakdown) continue;
+      try {
+        const bd = JSON.parse(row.qualityBreakdown);
+        n += Number(bd.naturalness) || 0;
+        cf += Number(bd.context_fit) || 0;
+        sm += Number(bd.style_match) || 0;
+        br += Number(bd.brevity) || 0;
+        ov += Number(bd.overall) || 0;
+        count++;
+      } catch {}
+    }
+
+    if (count === 0) {
+      res.json({ naturalness: 50, contextFit: 50, styleMatch: 50, brevity: 50, overall: 50, sampleSize: 0 });
+      return;
+    }
+
+    res.json({
+      naturalness: Math.round(n / count),
+      contextFit: Math.round(cf / count),
+      styleMatch: Math.round(sm / count),
+      brevity: Math.round(br / count),
+      overall: Math.round(ov / count),
+      sampleSize: count,
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+router.get("/intelligence/messages-per-day", async (req, res): Promise<void> => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT 
+        DATE(created_at AT TIME ZONE 'UTC') as date,
+        COUNT(*) as total,
+        ROUND(AVG(quality_score)::numeric, 1) as avg_quality
+      FROM bot_messages
+      WHERE created_at >= NOW() - INTERVAL '14 days'
+      GROUP BY DATE(created_at AT TIME ZONE 'UTC')
+      ORDER BY date ASC
+    `);
+    res.json(rows.rows ?? rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+export default router;

@@ -1,5 +1,45 @@
 # Twitch AI Bot — Development Log
 
+---
+
+### 2026-06-02 — Полная архитектурная переработка AI: Intelligence Center ✅
+
+**Что сделано:**
+
+**Схема БД (новые колонки и таблицы):**
+- `bot_messages`: добавлены `quality_score integer`, `quality_breakdown text` — хранят самооценку бота
+- `chat_patterns`: добавлены `quality_score real default 50`, `effectiveness_count integer`, `last_seen_at timestamp` — паттерны теперь живые
+- Новая таблица `bot_reflections` — журнал сессий самоанализа бота
+- `pnpm --filter @workspace/db run push` — всё применено
+
+**Новые bot-engine файлы:**
+- `quality-scorer.ts` — асинхронная LLM-оценка каждого отправленного сообщения по 4 критериям (naturalness, context_fit, style_match, brevity), результат 0-100 + JSON breakdown; обновляет паттерны через exponential moving average
+- `reflection-engine.ts` — система самоанализа: каждые 20 сообщений GPT анализирует последние 20-30 ответов бота, пишет критику и конкретные улучшения, сохраняет в `bot_reflections`; `decayOldPatterns()` снижает качество паттернов старше 14 дней
+
+**Обновлённые bot-engine файлы:**
+- `orchestrator.ts` — после каждой отправки: async `scoreBotMessage()` + `maybeRunReflection()` через `setImmediate`; паттерны выбираются по `quality_score * LN(frequency + 1)` вместо чистой частоты
+- `response-generator.ts` — `fetchLearnedPatterns()` переведён на quality-weighted сортировку
+
+**Новый API роут `/api/intelligence/*`:**
+- `GET /intelligence/metrics` — общая сводка: avg_quality, scored_messages, top/worst паттерны, total_reflections
+- `GET /intelligence/quality-trend?limit=60` — последние N сообщений с оценками для графика
+- `GET /intelligence/dna` — ДНК личности: средние значения 4 метрик по последним 50 оценённым сообщениям
+- `GET /intelligence/reflections` — список рефлексий
+- `POST /intelligence/reflect` — ручной запуск самоанализа
+- `GET /intelligence/messages-per-day` — статистика по дням (последние 14)
+
+**Новый дашборд (полный рефакторинг `dashboard.tsx`):**
+- Название: **Intelligence Center** (не просто Dashboard)
+- 5 KPI-карточек: Качество (с дельтой за неделю), Сообщений, Паттерны (с avg quality), Рефлексии, Аптайм
+- График качества сообщений — LineChart с цветными точками по уровню (зелёный/жёлтый/оранжевый)
+- ДНК личности — RadarChart по 4 осям (Естественность, Контекст, CS2-стиль, Краткость)
+- Bar chart по дням (последние 14 дней)
+- Топ паттерны с quality score и частотой
+- Рефлексии с кнопкой «Запустить» для ручного самоанализа
+- Последние сообщения + Live Telemetry feed
+
+---
+
 ## Цель проекта
 Создать ИИ-бота для Twitch, который наблюдает за CS2-стримами (видео + аудио), читает чат и пишет сообщения, неотличимые от живого русского зрителя. Главная задача — стать популярным стримером, поэтому бот должен максимально точно имитировать поведение аудитории топовых русских CS2 стримеров.
 

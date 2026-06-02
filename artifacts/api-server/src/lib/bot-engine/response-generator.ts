@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from "@workspace/db";
 import { chatPatternsTable } from "@workspace/db";
-import { desc } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { logger } from "../logger";
 
 let openaiClient: OpenAI | null = null;
@@ -22,9 +22,9 @@ export function resetClient(): void {
 async function fetchLearnedPatterns(limit = 40): Promise<string[]> {
   try {
     const rows = await db
-      .select({ content: chatPatternsTable.content, lang: chatPatternsTable.language })
+      .select({ content: chatPatternsTable.content })
       .from(chatPatternsTable)
-      .orderBy(desc(chatPatternsTable.frequency))
+      .orderBy(desc(sql`quality_score * LN(frequency + 1)`))
       .limit(limit);
     return rows.map((r) => r.content);
   } catch {

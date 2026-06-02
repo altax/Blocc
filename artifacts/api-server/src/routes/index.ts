@@ -12,6 +12,7 @@ import sessionsRouter from "./sessions";
 import learningRouter from "./learning";
 import corpusRouter from "./corpus";
 import testBotRouter from "./test-bot";
+import intelligenceRouter from "./intelligence";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(sessionsRouter);
 router.use(learningRouter);
 router.use(corpusRouter);
 router.use(testBotRouter);
+router.use(intelligenceRouter);
 
 export default router;
