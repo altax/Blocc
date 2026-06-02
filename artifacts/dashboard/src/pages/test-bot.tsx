@@ -20,6 +20,7 @@ interface TestResult {
   context: { game_event: string; streamer_speech: string; map: string; situation: string };
   tokens_used: number;
   model_used?: string;
+  demo_mode?: boolean;
 }
 
 interface DatasetStats {
@@ -80,7 +81,7 @@ export default function TestBot() {
       const r = await fetch("/api/bot/test-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, scenario_id: selectedScenario ?? "" }),
       });
       if (!r.ok) {
         const e = await r.json();
@@ -419,6 +420,17 @@ export default function TestBot() {
                 )}
               </div>
 
+              {/* Demo Mode banner */}
+              {lastResult.demo_mode && (
+                <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-xs text-yellow-400 flex items-start gap-2">
+                  <FlaskConical className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Demo Mode</span> — ответы из шаблонов, не от LLM.
+                    Чтобы увидеть реальный ИИ: добавь <strong>Gemini API</strong> ключ в Settings (бесплатно на <a href="https://aistudio.google.com" target="_blank" rel="noopener" className="underline underline-offset-2">aistudio.google.com</a>).
+                  </div>
+                </div>
+              )}
+
               {/* Generated variants */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -429,14 +441,16 @@ export default function TestBot() {
                     {lastResult.model_used && (
                       <span className={cn(
                         "px-1.5 py-0.5 rounded font-mono border",
-                        lastResult.model_used.includes("gemini")
+                        lastResult.demo_mode
+                          ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-400"
+                          : lastResult.model_used.includes("gemini")
                           ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
                           : "bg-green-500/10 border-green-500/30 text-green-400"
                       )}>
-                        {lastResult.model_used}
+                        {lastResult.demo_mode ? "demo" : lastResult.model_used}
                       </span>
                     )}
-                    <span>{lastResult.tokens_used} токенов</span>
+                    {!lastResult.demo_mode && <span>{lastResult.tokens_used} токенов</span>}
                   </div>
                 </div>
                 <div className="space-y-2">

@@ -76,6 +76,65 @@ router.get("/bot/test-scenarios", (_req, res): void => {
   res.json(TEST_SCENARIOS);
 });
 
+const DEMO_POOLS: Record<string, string[][]> = {
+  ace_awp: [
+    ["ааааа", "ОРУ", "кто так делает вообще", "бог", "в топ 10 лучших моментов года"],
+    ["вот это да", "нереально", "AWP бог", "красава", "ору с него"],
+    ["KEKW", "топ стример", "5 пуль 5 смертей", "збс", "монстр"],
+  ],
+  clutch_1v3: [
+    ["клатч клатч клатч", "ору", "как он это сделал", "нож в конце кек", "легенда"],
+    ["это не человек", "красавчик", "1v3 как нечего делать", "монстр", "KEKW"],
+    ["ааа нож!!!", "нагибатор", "вп", "збс момент", "ору с этого"],
+  ],
+  streamer_died_stupid: [
+    ["KEKW", "ну и зачем", "классика", "всегда так", "предсказуемо"],
+    ["кек", "ору", "зачем выпрыгивать из дыма", "типичный", "пг"],
+    ["капец", "ну всё", "кринж", "OMEGALUL", "сам виноват кек"],
+  ],
+  win_round_pistol: [
+    ["глок имба", "пистолетный наш", "gg", "топ раунд", "начало хорошее"],
+    ["вот это начало", "кек глок убивает", "gg wp", "збс", "красава"],
+    ["пистолетный зашёл", "топ", "gg", "хорошее начало", "монстр"],
+  ],
+  loss_eco: [
+    ["ну и...", "эко провалилось", "gg", "капец", "всё как обычно"],
+    ["KEKW они купили всё", "классика", "ну и ладно", "эко не зашло", "пг"],
+    ["так и знал", "gg", "кек", "миллионеры KEKW", "не зашло"],
+  ],
+  watching_pro: [
+    ["s1mple это не человек", "нереально", "топ 1 мира не зря", "ору", "как он это делает"],
+    ["аниме персонаж", "бог AWP", "легенда", "нереальный флик", "збс"],
+    ["ору с него", "это не человек да", "такое нельзя повторить", "монстр", "KEKW"],
+  ],
+};
+
+const GENERIC_DEMO: string[][] = [
+  ["топ момент", "ору", "KEKW", "красава", "нагиб"],
+  ["кек", "збс", "вп", "монстр", "нереально"],
+  ["ааа", "ну ты даёшь", "классно", "Pog", "👀"],
+];
+
+function pickDemoVariants(scenarioId: string, count: number, extraPatterns: string[]): string[] {
+  const pool = DEMO_POOLS[scenarioId] ?? GENERIC_DEMO;
+  const variants: string[] = [];
+  const usedSets = new Set<number>();
+
+  for (let i = 0; i < count; i++) {
+    let setIdx = Math.floor(Math.random() * pool.length);
+    if (usedSets.has(setIdx)) setIdx = (setIdx + 1) % pool.length;
+    usedSets.add(setIdx);
+    const words = [...pool[setIdx]];
+    if (extraPatterns.length > 0 && Math.random() < 0.4) {
+      const pat = extraPatterns[Math.floor(Math.random() * extraPatterns.length)];
+      words.push(pat);
+    }
+    const idx = Math.floor(Math.random() * words.length);
+    variants.push(words[idx] ?? words[0]);
+  }
+  return variants;
+}
+
 router.post("/bot/test-message", async (req, res): Promise<void> => {
   const {
     game_event = "",
@@ -84,6 +143,7 @@ router.post("/bot/test-message", async (req, res): Promise<void> => {
     situation = "",
     custom_context = "",
     count = 3,
+    scenario_id = "",
   } = req.body ?? {};
 
   try {
@@ -92,8 +152,22 @@ router.post("/bot/test-message", async (req, res): Promise<void> => {
     const hasGemini = !!settings?.geminiApiKey;
 
     if (!hasOpenAI && !hasGemini) {
-      res.status(400).json({
-        error: "Нет API ключа. Добавь OpenAI или Gemini ключ в Settings. Gemini — бесплатно на aistudio.google.com",
+      const patternRows = await db
+        .select({ content: chatPatternsTable.content, lang: chatPatternsTable.language })
+        .from(chatPatternsTable)
+        .orderBy(desc(chatPatternsTable.frequency))
+        .limit(20);
+      const ruPatterns = patternRows.filter((p) => p.lang === "ru").map((p) => p.content);
+
+      const variants = pickDemoVariants(scenario_id, Math.min(count, 5), ruPatterns);
+
+      res.json({
+        variants,
+        patterns_used: ruPatterns.slice(0, 5),
+        context: { game_event, streamer_speech, map, situation },
+        tokens_used: 0,
+        model_used: "demo",
+        demo_mode: true,
       });
       return;
     }
