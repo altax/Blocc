@@ -2,6 +2,60 @@
 
 ---
 
+## ✅ СПРИНТ — Intelligence Upgrade v3: Stream Narrative + RLHF Reactions + Golden Patterns
+
+**Дата:** 2026-06-02
+
+**Цель:** Три критических улучшения для максимальной неотличимости от живого зрителя: (1) 60-минутная нарративная память стрима, (2) RLHF-аналог через реакции чата, (3) золотые паттерны в system prompt.
+
+---
+
+### Новые модули
+
+**`stream-narrative.ts`** — 60-минутная нарративная память (NEW)
+- Timeline событий с окном 60 минут (NarrativeEvent: game_moment/chat_reaction/streamer_speech/bot_message/mood_shift)
+- Автосжатие событий старше 15 минут в текстовую дугу Arc сегментов каждые 10 минут
+- `addNarrativeEvent(type, description, intensity)` — записывает CS2 события, реплики стримера, сообщения бота
+- `markBotMessageGotReaction(message)` — помечает сообщение бота как подтверждённо зашедшее в чат
+- `getNarrativeForPrompt()` — строит строку "История стрима" для инъекции в промпт: arc history + последние события + золотые реплики бота
+- Бот теперь знает что было в начале стрима, а не только последние 5 минут
+
+**`reaction-tracker.ts`** — RLHF-аналог через реакции чата (NEW)
+- `registerBotMessage(dbId, message, context, momentType, triggerType, channel)` — регистрирует исходящее сообщение
+- Через 45 секунд оценивает реакции: эхо слов (+15), reaction emotes (+8), русские реакции (+10), всплеск активности x1.5 (+20)
+- Порог реакции: 25/100 → callback → сохранение в `golden_bot_messages`
+- `feedChatMessage(user, message)` — получает поток IRC чата (буфер 5 минут)
+- `setReactionCallback(cb)` — подключает handler сохранения золотых паттернов
+
+**`lib/db/src/schema/golden-patterns.ts`** — Новая таблица `golden_bot_messages` (NEW)
+- Поля: message, trigger_type, context_snapshot, moment_type, channel, reaction_count, reaction_score, times_used_in_prompt
+- Хранит ТОЛЬКО те сообщения бота которые получили реальные реакции от живых зрителей
+
+### Изменения существующих модулей
+
+**`orchestrator.ts`** — Wire-up всех новых систем
+- При старте: `startNarrative()`, `resetReactionTracker()`, `setReactionCallback(onReactionConfirmed)`
+- `onReactionConfirmed()` — async callback: сохраняет в `golden_bot_messages` + вызывает `markBotMessageGotReaction` + пишет лог "✨ Золотой паттерн"
+- После `sendMessage()`: `registerBotMessage(...)` запускает 45-сек таймер мониторинга
+- `addNarrativeEvent("bot_message", message, intensity)` — каждое сообщение бота в нарратив
+- `onSpeechTranscript()` + `onVisionSummary()` → добавляют `game_moment` события в нарратив
+- `getBotStatusPayload()` теперь включает `narrative_active` флаг
+
+**`context-builder.ts`** — Секция "История стрима" в контекст
+- `getNarrativeForPrompt()` инжектируется как `📖 История стрима:` раздел перед game state
+- Бот видит arc: что было 30-60 минут назад + ключевые недавние события + свои хиты
+
+**`response-generator.ts`** — Золотые примеры в system prompt (RLHF)
+- `fetchGoldenMessages(8)` — загружает топ-8 золотых паттернов по `reaction_score * LN(reaction_count+1)`
+- Секция `ЗОЛОТЫЕ ПРИМЕРЫ` в system prompt — выше приоритетом чем обычные паттерны
+- Фильтрация под текущий `momentType` — если клатч идёт, показываем клатч-реакции которые зашли
+- `generateChatMessage()` теперь параллельно загружает: learnedPatterns + goldenMessages + reflectionDelta
+
+### DB изменения
+- Новая таблица `golden_bot_messages` — создана через `drizzle-kit push`
+
+---
+
 ## ✅ СПРИНТ — Intelligence Upgrade v2: Настоящий самообучающийся ИИ
 
 **Дата:** 2026-06-02

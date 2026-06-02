@@ -3,3 +3,4 @@ export * from "./logs";
 export * from "./messages";
 export * from "./patterns";
 export * from "./reflections";
+export * from "./golden-patterns";

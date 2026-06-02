@@ -1,6 +1,7 @@
 import { getGameState, getGameStateDescription, type CS2GameState } from "./game-state-machine";
 import { getHypeState, type HypeState } from "./chat-hype-detector";
 import { getSession, getSessionContextString, getMoodInstruction } from "./session-memory";
+import { getNarrativeForPrompt } from "./stream-narrative";
 
 export interface BotContext {
   recentSpeech: string[];
@@ -57,7 +58,7 @@ export function getContext(): BotContext {
 
 /**
  * Выбирает паттерны контекстно-зависимо, а не случайно.
- * Высокий хайп → хайп-паттерны, клатч → реакшн-паттерны.
+ * Высокий хайп → короткие паттерны, клатч → реакшн-паттерны.
  */
 export function selectContextualPatterns(
   patterns: string[],
@@ -68,81 +69,68 @@ export function selectContextualPatterns(
   const gs = getGameState();
   const hs = getHypeState();
 
-  // Хайп в чате → короткие паттерны (обычно они самые вирусные)
   if (hs.isHot && hs.currentLevel >= 7) {
     const short = patterns.filter((p) => p.split(" ").length <= 4);
     if (short.length >= 5) {
-      return {
-        patterns: short.slice(0, limit),
-        reason: `hype:${hs.currentLevel}`,
-      };
+      return { patterns: short.slice(0, limit), reason: `hype:${hs.currentLevel}` };
     }
   }
 
-  // Клатч или бомба → реакции
   if (gs.isClutch || gs.isBombPlanted || gs.momentType === "clutch") {
     const reaction = patterns.filter((p) =>
       /ору|боже|нееее|монка|omg|wow|!!|клатч|clutch/i.test(p)
     );
     if (reaction.length >= 3) {
-      return {
-        patterns: reaction.slice(0, limit),
-        reason: `clutch_moment`,
-      };
+      return { patterns: reaction.slice(0, limit), reason: "clutch_moment" };
     }
   }
 
-  // Эйс/победа → хайп
   if (gs.momentType === "ace" || gs.momentType === "win") {
     const hype = patterns.filter((p) =>
-      /кр а сава|топ|имба|пог|pog|лол|збс|красава|вп|ez|nice/i.test(p)
+      /красава|топ|имба|пог|pog|лол|збс|вп|ez|nice/i.test(p)
     );
     if (hype.length >= 3) {
-      return {
-        patterns: hype.slice(0, limit),
-        reason: `ace_win`,
-      };
+      return { patterns: hype.slice(0, limit), reason: "ace_win" };
     }
   }
 
-  // Смерть/поражение → сочувствие или сарказм
   if (gs.momentType === "death" || gs.momentType === "loss" || gs.consecutiveLosses >= 3) {
     const sad = patterns.filter((p) =>
       /f|пепега|кек|жиза|copium|sadge|ну и|блин/i.test(p)
     );
     if (sad.length >= 3) {
-      return {
-        patterns: sad.slice(0, limit),
-        reason: `death_loss`,
-      };
+      return { patterns: sad.slice(0, limit), reason: "death_loss" };
     }
   }
 
-  // По умолчанию — топ паттерны по весу
   return { patterns: patterns.slice(0, limit), reason: "weighted_default" };
 }
 
 /**
  * Полный контекст-стринг для промпта — центральная функция.
- * Теперь включает: game state, hype level, session arc, умные паттерны.
+ * Включает: stream narrative (60 мин дуга), game state, hype, session, паттерны.
  */
 export function buildContextString(patterns: string[]): string {
   const parts: string[] = [];
   const gs = getGameState();
   const hs = getHypeState();
-  const session = getSession();
 
-  // --- Stream meta ---
   if (context.streamTitle) parts.push(`🎮 Стрим: "${context.streamTitle}"`);
   if (context.gameName) parts.push(`Игра: ${context.gameName}`);
 
-  // --- CS2 Game State (НОВОЕ) ---
+  // --- Stream narrative arc (60-min memory) ---
+  const narrative = getNarrativeForPrompt();
+  if (narrative) {
+    parts.push(`\n📖 История стрима:\n${narrative}`);
+  }
+
+  // --- CS2 Game State ---
   const gsDesc = getGameStateDescription();
   if (gsDesc && gsDesc !== "Обычный момент") {
     parts.push(`\n📊 CS2 Состояние: ${gsDesc}`);
   }
 
-  // --- Hype State (НОВОЕ) ---
+  // --- Hype State ---
   if (hs.currentLevel >= 3) {
     const hypeLabel =
       hs.currentLevel >= 8 ? "🔥 ЧАТРУМ ВЗРЫВАЕТСЯ" :
@@ -178,20 +166,20 @@ export function buildContextString(patterns: string[]): string {
     context.recentBotMessages.slice(-6).forEach((m) => parts.push(`  - "${m}"`));
   }
 
-  // --- Session context (НОВОЕ) ---
+  // --- Session context ---
   const sessionCtx = getSessionContextString();
   if (sessionCtx) {
     parts.push(`\n📝 Контекст сессии:\n${sessionCtx}`);
   }
 
-  // --- Contextual patterns (НОВОЕ — умный выбор) ---
+  // --- Contextual patterns ---
   const { patterns: selectedPatterns, reason } = selectContextualPatterns(patterns);
   if (selectedPatterns.length > 0) {
     parts.push(`\n📚 Реальные фразы из чатов (стиль, не копировать) [${reason}]:`);
     selectedPatterns.forEach((p) => parts.push(`  - "${p}"`));
   }
 
-  // --- Mood instruction (НОВОЕ) ---
+  // --- Mood instruction ---
   const moodHint = getMoodInstruction();
   if (moodHint) {
     parts.push(`\n💡 Подсказка: ${moodHint}`);

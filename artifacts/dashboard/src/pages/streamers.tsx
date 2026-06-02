@@ -148,7 +148,7 @@ function StreamerCard({
   description: string;
   onlineInfo: OnlineCheckItem | null;
   isCollecting: boolean;
-  activeSession: { message_count: number; started_at: string; game_name: string | null } | null;
+  activeSession: { message_count: number; started_at: string; game_name?: string | null } | null;
   onCollect: () => void;
   onStartSession: () => void;
   onStopSession: () => void;

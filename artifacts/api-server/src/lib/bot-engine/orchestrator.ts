@@ -1,5 +1,5 @@
 import { db } from "@workspace/db";
-import { botLogsTable, botMessagesTable, chatPatternsTable, botSettingsTable } from "@workspace/db";
+import { botLogsTable, botMessagesTable, chatPatternsTable, botSettingsTable, goldenBotMessagesTable } from "@workspace/db";
 import { desc, sql } from "drizzle-orm";
 import { getBotState, setBotRunning, incrementMessagesSent, setLastAction, getUptimeSeconds } from "../bot-state";
 import { TwitchIrcClient } from "./twitch-irc";
@@ -10,6 +10,8 @@ import { maybeRunReflection } from "./reflection-engine";
 import { recordChatMessage, getHypeState, resetHypeDetector } from "./chat-hype-detector";
 import { updateGameState, getGameState, resetGameState } from "./game-state-machine";
 import { startSession, endSession, recordNotableMoment, recordBotMessage as recordSessionMessage, recordStreamerNote } from "./session-memory";
+import { startNarrative, resetNarrative, addNarrativeEvent, markBotMessageGotReaction, getNarrativeIsActive } from "./stream-narrative";
+import { registerBotMessage, feedChatMessage, setReactionCallback, resetReactionTracker, type PendingBotMessage } from "./reaction-tracker";
 import { logger } from "../logger";
 
 let ircClient: TwitchIrcClient | null = null;
@@ -18,7 +20,6 @@ let hotTriggerTimer: NodeJS.Timeout | null = null;
 let lastMessageAt = 0;
 let lastHotTriggerAt = 0;
 
-// Минимальная задержка между горячими триггерами (не спамить на одном моменте)
 const HOT_TRIGGER_COOLDOWN_MS = 8_000;
 
 async function log(type: string, content: string, metadata?: string): Promise<void> {
@@ -44,8 +45,43 @@ async function getQualityWeightedPatterns(): Promise<string[]> {
 }
 
 /**
+ * Callback от reaction-tracker: сообщение бота получило реакции чата.
+ * Сохраняем в golden_bot_messages, обновляем narrative.
+ */
+async function onReactionConfirmed(
+  pending: PendingBotMessage,
+  reactionScore: number,
+  reactionCount: number
+): Promise<void> {
+  try {
+    await db.insert(goldenBotMessagesTable).values({
+      message: pending.message,
+      triggerType: pending.triggerType,
+      contextSnapshot: pending.contextSnapshot.slice(0, 300),
+      momentType: pending.momentType,
+      channel: pending.channel,
+      reactionCount,
+      reactionScore,
+    });
+
+    markBotMessageGotReaction(pending.message);
+
+    logger.info(
+      { message: pending.message.slice(0, 40), reactionScore, reactionCount },
+      "Golden pattern saved — message got chat reactions"
+    );
+
+    await log(
+      "decision",
+      `✨ Золотой паттерн: "${pending.message.slice(0, 50)}" (реакция: ${Math.round(reactionScore)}/100, ${reactionCount} ответов)`,
+    );
+  } catch (err) {
+    logger.warn({ err }, "Failed to save golden pattern (non-fatal)");
+  }
+}
+
+/**
  * Основной цикл принятия решений — запускается каждые 15 секунд.
- * Стандартный путь: cooldown → shouldRespond → generate → send.
  */
 async function runDecisionLoop(): Promise<void> {
   const settings = await getSettings();
@@ -81,7 +117,7 @@ async function runDecisionLoop(): Promise<void> {
 
 /**
  * Горячий триггер — мониторит хайп чата и интенсивность момента.
- * Запускается каждые 3 секунды. При высоком хайпе → немедленная реакция.
+ * Запускается каждые 3 секунды.
  */
 async function runHotTriggerCheck(): Promise<void> {
   if (!getBotState().running) return;
@@ -118,13 +154,12 @@ async function runHotTriggerCheck(): Promise<void> {
     const patterns = await getQualityWeightedPatterns();
     const contextStr = buildContextString(patterns);
 
-    // Горячий триггер обходит shouldRespond — момент уже проверен
     const should = await shouldRespond(
       settings.openaiApiKey,
       contextStr,
-      false, // cooldown уже проверен выше
+      false,
       settings.geminiApiKey,
-      true // forceTrigger
+      true
     );
 
     if (!should) return;
@@ -137,7 +172,6 @@ async function runHotTriggerCheck(): Promise<void> {
 
 /**
  * Универсальная функция отправки сообщения.
- * Используется и из decision loop, и из hot trigger.
  */
 async function sendMessage(
   settings: Awaited<ReturnType<typeof getSettings>>,
@@ -151,7 +185,6 @@ async function sendMessage(
   const gs = getGameState();
   const hs = getHypeState();
 
-  // Определяем trigger type для записи
   let triggerType: string;
   if (triggerSource === "hot_trigger") {
     triggerType = gs.momentType !== "normal" ? `hot_${gs.momentType}` : "hot_hype";
@@ -171,13 +204,8 @@ async function sendMessage(
 
   if (!message) return;
 
-  // Задержка: горячие триггеры реагируют быстрее (0.5-3 сек), обычные — медленнее
-  const minDelay = triggerSource === "hot_trigger"
-    ? 500
-    : settings.minDelaySeconds * 1000;
-  const maxDelay = triggerSource === "hot_trigger"
-    ? 3000
-    : settings.maxDelaySeconds * 1000;
+  const minDelay = triggerSource === "hot_trigger" ? 500 : settings.minDelaySeconds * 1000;
+  const maxDelay = triggerSource === "hot_trigger" ? 3000 : settings.maxDelaySeconds * 1000;
   const delay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
 
   await new Promise((r) => setTimeout(r, delay));
@@ -190,10 +218,11 @@ async function sendMessage(
   setLastAction(`Sent: "${message}"`);
   addBotMessage(message);
 
-  // Записываем в session memory
   recordSessionMessage(message);
 
-  // Записываем заметный момент если это был hot trigger
+  // Narrative: записываем что бот написал (gotReaction=false, обновится позже)
+  addNarrativeEvent("bot_message", message, gs.momentIntensity, false);
+
   if (triggerSource === "hot_trigger" && gs.momentIntensity >= 7) {
     recordNotableMoment(gs.momentType, gs.lastEventDescription, gs.momentIntensity, true);
   }
@@ -214,6 +243,16 @@ async function sendMessage(
     contextSummary: contextStr.slice(0, 300),
   }).returning({ id: botMessagesTable.id });
 
+  // Reaction tracker: начинаем мониторить реакции чата (RLHF)
+  registerBotMessage(
+    inserted?.id ?? null,
+    message,
+    contextStr.slice(0, 300),
+    gs.momentType,
+    triggerType,
+    settings.channelName
+  );
+
   // Асинхронные задачи: scoring + reflection
   if (inserted?.id && (settings.openaiApiKey || settings.geminiApiKey)) {
     setImmediate(() => {
@@ -224,7 +263,6 @@ async function sendMessage(
         settings.openaiApiKey,
         settings.geminiApiKey || undefined
       ).then((result: any) => {
-        // Обновляем session memory качеством
         if (result?.overall) recordSessionMessage(message, result.overall);
       }).catch(() => {});
     });
@@ -236,7 +274,7 @@ async function sendMessage(
 }
 
 /**
- * Слушаем речь стримера и классифицируем по типу
+ * Классификация речи стримера
  */
 function classifySpeech(text: string): void {
   const lower = text.toLowerCase();
@@ -253,6 +291,12 @@ function classifySpeech(text: string): void {
   else if (text.length > 20) recordStreamerNote(text, "info");
 
   addSpeechTranscript(text);
+
+  // Narrative: интересная реплика стримера
+  if (isTilted || isHype || isFunny) {
+    const intensity = isHype ? 6 : isTilted ? 5 : 4;
+    addNarrativeEvent("streamer_speech", text.slice(0, 80), intensity);
+  }
 }
 
 export async function startBot(): Promise<void> {
@@ -267,10 +311,16 @@ export async function startBot(): Promise<void> {
 
   setBotRunning(true, settings.channelName);
 
-  // Инициализируем новые модули
   resetHypeDetector();
   resetGameState();
+  resetReactionTracker();
+  resetNarrative();
+
   startSession(settings.channelName);
+  startNarrative(settings.channelName);
+
+  // Регистрируем callback для реакций — сохранять золотые паттерны
+  setReactionCallback(onReactionConfirmed);
 
   await log("decision", `Бот запущен на канале: ${settings.channelName}`);
 
@@ -281,13 +331,12 @@ export async function startBot(): Promise<void> {
     onMessage: (username, message) => {
       if (username.toLowerCase() === (settings.botUsername || "").toLowerCase()) return;
 
-      // Пишем в context builder
       addChatMessage(username, message);
-
-      // Пишем в hype detector
       recordChatMessage(username, message);
 
-      // Если это речь стримера — классифицируем (для каналов со STT)
+      // Reaction tracker получает все сообщения чата
+      feedChatMessage(username, message);
+
       if (username === settings.channelName.toLowerCase()) {
         classifySpeech(message);
       }
@@ -307,13 +356,10 @@ export async function startBot(): Promise<void> {
     await log("error", `IRC connect failed: ${String(err)} — работаем в симуляционном режиме`);
   }
 
-  // Стандартный таймер — каждые 15 секунд
   decisionTimer = setInterval(runDecisionLoop, 15_000);
-
-  // Горячий триггер — каждые 3 секунды
   hotTriggerTimer = setInterval(runHotTriggerCheck, 3_000);
 
-  logger.info({ channel: settings.channelName }, "Bot started with hot trigger system");
+  logger.info({ channel: settings.channelName }, "Bot started with hot trigger + reaction tracker + stream narrative");
 }
 
 export async function stopBot(): Promise<void> {
@@ -331,7 +377,9 @@ export async function stopBot(): Promise<void> {
   ircClient?.disconnect();
   ircClient = null;
 
-  // Сохраняем итоги сессии
+  resetReactionTracker();
+  resetNarrative();
+
   const sessionSummary = endSession();
   if (sessionSummary) {
     logger.info(
@@ -356,8 +404,12 @@ export async function stopBot(): Promise<void> {
  */
 export function onSpeechTranscript(text: string): void {
   classifySpeech(text);
-  // Обновляем game state из речи стримера
-  updateGameState(text);
+  const gs = updateGameState(text);
+
+  // Narrative: записываем CS2 события из речи
+  if (gs.momentType !== "normal" && gs.momentIntensity >= 4) {
+    addNarrativeEvent("game_moment", `${gs.momentType} (речь)`, gs.momentIntensity);
+  }
 }
 
 /**
@@ -365,7 +417,11 @@ export function onSpeechTranscript(text: string): void {
  */
 export function onVisionSummary(summary: string): void {
   addVisionSummary(summary);
-  // game state уже обновляется внутри vision-analyzer
+
+  const gs = getGameState();
+  if (gs.momentType !== "normal" && gs.momentIntensity >= 5) {
+    addNarrativeEvent("game_moment", `${gs.momentType}: ${summary.slice(0, 80)}`, gs.momentIntensity);
+  }
 }
 
 export function getBotStatusPayload() {
@@ -379,7 +435,6 @@ export function getBotStatusPayload() {
     uptime_seconds: getUptimeSeconds(),
     messages_sent: state.messagesSent,
     last_action: state.lastAction,
-    // Новые поля
     game_state: {
       moment_type: gs.momentType,
       moment_intensity: gs.momentIntensity,
@@ -396,5 +451,6 @@ export function getBotStatusPayload() {
       velocity: hs.chatVelocity,
       dominant_topic: hs.dominantTopic,
     },
+    narrative_active: getNarrativeIsActive(),
   };
 }

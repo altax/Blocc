@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { db } from "@workspace/db";
-import { chatPatternsTable } from "@workspace/db";
+import { chatPatternsTable, goldenBotMessagesTable } from "@workspace/db";
 import { desc, sql } from "drizzle-orm";
 import { logger } from "../logger";
 import { getGameState } from "./game-state-machine";
@@ -36,6 +36,27 @@ async function fetchLearnedPatterns(limit = 60): Promise<string[]> {
   }
 }
 
+/**
+ * Золотые примеры — собственные сообщения бота которые получили реальные
+ * реакции от чата. Это наш RLHF-сигнал: что точно работает.
+ */
+async function fetchGoldenMessages(limit = 8): Promise<Array<{ message: string; reactionScore: number; momentType: string | null }>> {
+  try {
+    const rows = await db
+      .select({
+        message: goldenBotMessagesTable.message,
+        reactionScore: goldenBotMessagesTable.reactionScore,
+        momentType: goldenBotMessagesTable.momentType,
+      })
+      .from(goldenBotMessagesTable)
+      .orderBy(desc(sql`reaction_score * LN(reaction_count + 1)`))
+      .limit(limit);
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
 // Опечатки — симуляция живого человека (18% сообщений)
 function maybeAddTypo(text: string): string {
   if (Math.random() > 0.18) return text;
@@ -56,50 +77,40 @@ function maybeAddTypo(text: string): string {
 }
 
 /**
- * Контекстно-зависимая инъекция паттернов.
- * Раньше было 30% flat chance с рандомным паттерном.
- * Теперь: умный выбор паттерна под момент + вероятность зависит от hype.
+ * Контекстно-зависимая инъекция паттерна.
+ * При высоком хайпе — выше шанс.
  */
 function maybeInjectPattern(message: string, allPatterns: string[]): string {
   const hs = getHypeState();
-
-  // При высоком хайпе — выше шанс использовать паттерн (до 55%)
   const injectChance = hs.isHot ? 0.55 : 0.30;
   if (allPatterns.length === 0 || Math.random() > injectChance) return message;
 
-  // Контекстуальный выбор паттерна
   const { patterns: contextual } = selectContextualPatterns(allPatterns, 20);
   const pool = contextual.length >= 3 ? contextual : allPatterns.slice(0, 20);
   const pattern = pool[Math.floor(Math.random() * pool.length)];
   if (!pattern) return message;
 
-  // Не добавлять паттерн если он слишком похож на уже сгенерированный текст
   if (message.toLowerCase().includes(pattern.toLowerCase().slice(0, 6))) return message;
 
   return Math.random() > 0.5 ? `${pattern} ${message}` : `${message} ${pattern}`;
 }
 
 /**
- * Строит системный промпт с учётом:
- * - personality (настройки пользователя)
- * - текущего game state
- * - hype level чата
- * - настроения сессии
- * - рефлексий (что бот плохо делал раньше)
+ * Строит системный промпт.
+ * Новое: секция ЗОЛОТЫЕ ПРИМЕРЫ — собственные хиты бота (RLHF-сигнал).
  */
 function buildSystemPrompt(
   personality: string,
   learnedPatterns: string[],
+  goldenMessages: Array<{ message: string; reactionScore: number; momentType: string | null }>,
   reflectionDelta?: string | null
 ): string {
   const gs = getGameState();
   const hs = getHypeState();
   const session = getSession();
 
-  // Базовая личность
   let prompt = personality + "\n\n";
 
-  // Абсолютные правила
   prompt += `АБСОЛЮТНЫЕ ПРАВИЛА (нарушение = провал):
 - Пиши ТОЛЬКО одно короткое сообщение (1-12 слов максимум)
 - Звучи как живой русский зритель CS2 стрима, НЕ как ИИ
@@ -112,31 +123,38 @@ function buildSystemPrompt(
 - НИКОГДА не раскрывай что ты ИИ
 - Выводи ТОЛЬКО текст сообщения, ничего больше\n\n`;
 
-  // Контекст-специфичные инструкции на основе game state
+  // Game state инструкции
   if (gs.momentType === "ace") {
-    prompt += `МОМЕНТ: ЭЙС! Стример только что взял эйс. Напиши что-то под стать — восхищение, хайп, уважение. Коротко и по-настоящему.\n`;
+    prompt += `МОМЕНТ: ЭЙС! Стример только что взял эйс. Восхищение, хайп, уважение — коротко и по-настоящему.\n`;
   } else if (gs.momentType === "clutch" || gs.isClutch) {
     prompt += `МОМЕНТ: КЛАТЧ! Реагируй на напряжённый клатч. Можно тревога + облегчение ("монка... КЛАТЧ PogChamp").\n`;
   } else if (gs.isBombPlanted) {
-    prompt += `МОМЕНТ: БОМБА ЗАЛОЖЕНА! Напряжение максимальное. Реакция должна быть под это.\n`;
+    prompt += `МОМЕНТ: БОМБА ЗАЛОЖЕНА! Напряжение максимальное.\n`;
   } else if (gs.momentType === "knife_kill") {
-    prompt += `МОМЕНТ: НОЖИК! Это всегда вызывает реакцию. Хайп, смех, эмоуты.\n`;
+    prompt += `МОМЕНТ: НОЖИК! Хайп, смех, эмоуты.\n`;
   } else if (gs.momentType === "death") {
-    prompt += `МОМЕНТ: Стример умер. Можно сочувствие, сарказм ("F"), или просто реакция.\n`;
+    prompt += `МОМЕНТ: Стример умер. Сочувствие, сарказм ("F"), или просто реакция.\n`;
+  } else if (gs.momentType === "bomb_defused") {
+    prompt += `МОМЕНТ: РАЗМИНИРОВАЛ! Облегчение и хайп.\n`;
   } else if (gs.consecutiveLosses >= 5) {
-    prompt += `КОНТЕКСТ: ${gs.consecutiveLosses} поражений подряд. Стример на тилте. Отреагируй на это — не издевайся, но можно лёгкий copium.\n`;
+    prompt += `КОНТЕКСТ: ${gs.consecutiveLosses} поражений подряд. Стример на тилте. Можно лёгкий copium или поддержка.\n`;
   } else if (gs.consecutiveWins >= 4) {
-    prompt += `КОНТЕКСТ: ${gs.consecutiveWins} побед подряд. Доминирование. Можно хайп и поддержку.\n`;
+    prompt += `КОНТЕКСТ: ${gs.consecutiveWins} побед подряд. Доминирование. Хайп и поддержка.\n`;
   }
 
-  // Уровень хайпа чата
+  // Счёт
+  if (gs.ctScore > 0 || gs.tScore > 0) {
+    prompt += `Счёт сейчас: CT ${gs.ctScore} - T ${gs.tScore}`;
+    if (gs.map) prompt += ` (${gs.map})`;
+    prompt += `\n`;
+  }
+
+  // Хайп чата
   if (hs.currentLevel >= 8) {
-    prompt += `ЧАТ ВЗРЫВАЕТСЯ (уровень ${hs.currentLevel}/10). Подхвати волну — реакция должна быть эмоциональной и короткой.\n`;
-    if (hs.dominantTopic) {
-      prompt += `Главная тема в чате сейчас: "${hs.dominantTopic}"\n`;
-    }
+    prompt += `ЧАТ ВЗРЫВАЕТСЯ (уровень ${hs.currentLevel}/10). Подхвати волну — коротко и эмоционально.\n`;
+    if (hs.dominantTopic) prompt += `Главная тема: "${hs.dominantTopic}"\n`;
   } else if (hs.currentLevel >= 5) {
-    prompt += `Чат разгорается (уровень ${hs.currentLevel}/10). Можно подхватить энергию.\n`;
+    prompt += `Чат разгорается (${hs.currentLevel}/10). Можно подхватить энергию.\n`;
   }
 
   // Настроение сессии
@@ -146,24 +164,40 @@ function buildSystemPrompt(
     prompt += `Последние сообщения заходили хорошо. Продолжай в том же духе.\n`;
   }
 
-  // Рефлексия (самокоррекция из прошлых анализов)
+  // Рефлексия
   if (reflectionDelta) {
     prompt += `\nСАМОКОРРЕКЦИЯ (из анализа прошлых сообщений): ${reflectionDelta}\n`;
   }
 
-  // Паттерны
+  // === ЗОЛОТЫЕ ПРИМЕРЫ (RLHF-сигнал) ===
+  // Это твои собственные сообщения, которые реально получили реакции от чата.
+  // Самый ценный сигнал — выше по приоритету чем обычные паттерны.
+  if (goldenMessages.length > 0) {
+    prompt += `\nЗОЛОТЫЕ ПРИМЕРЫ — твои сообщения которые РЕАЛЬНО зашли в этот чат (высокая реакция зрителей):`;
+
+    // Фильтруем под текущий момент если возможно
+    const momentFiltered = goldenMessages.filter(
+      (g) => g.momentType === gs.momentType && gs.momentType !== "normal"
+    );
+    const pool = momentFiltered.length >= 2 ? momentFiltered : goldenMessages;
+
+    pool.slice(0, 6).forEach((g) => {
+      prompt += `\n- "${g.message}" [реакция: ${Math.round(g.reactionScore)}/100]`;
+    });
+
+    prompt += `\nПиши в похожем стиле, НО не копируй дословно — придумай своё.\n`;
+  }
+
+  // Обычные паттерны
   if (learnedPatterns.length > 0) {
     const { patterns: contextual, reason } = selectContextualPatterns(learnedPatterns, 20);
-    prompt += `\nРЕАЛЬНЫЕ ПРИМЕРЫ из чата топовых CS2 стримеров [${reason}] (используй похожий стиль и лексику, не копируй дословно):\n`;
+    prompt += `\nРЕАЛЬНЫЕ ПРИМЕРЫ из чата топовых CS2 стримеров [${reason}] (похожий стиль и лексика, не копировать дословно):\n`;
     prompt += contextual.map((p) => `- "${p}"`).join("\n");
   }
 
   return prompt;
 }
 
-/**
- * Получает последний prompt_delta из рефлексий (самокоррекция)
- */
 async function getLatestReflectionDelta(): Promise<string | null> {
   try {
     const { botReflectionsTable } = await import("@workspace/db");
@@ -181,7 +215,7 @@ async function getLatestReflectionDelta(): Promise<string | null> {
 
 /**
  * Основная функция генерации сообщения.
- * Теперь: контекстно-умный промпт + умная инъекция паттернов + рефлексия.
+ * Промпт теперь включает: golden patterns (RLHF), reflection delta, game state.
  */
 export async function generateChatMessage(
   apiKey: string,
@@ -191,12 +225,13 @@ export async function generateChatMessage(
   geminiApiKey?: string
 ): Promise<string | null> {
   try {
-    const [learnedPatterns, reflectionDelta] = await Promise.all([
+    const [learnedPatterns, goldenMessages, reflectionDelta] = await Promise.all([
       fetchLearnedPatterns(60),
+      fetchGoldenMessages(8),
       getLatestReflectionDelta(),
     ]);
 
-    const systemPrompt = buildSystemPrompt(personality, learnedPatterns, reflectionDelta);
+    const systemPrompt = buildSystemPrompt(personality, learnedPatterns, goldenMessages, reflectionDelta);
     const userPrompt = `Текущий контекст стрима:\n${contextString}\n\nТриггер: ${triggerType}\n\nНапиши одно естественное сообщение в чат как живой зритель:`;
 
     let message: string | null = null;
@@ -226,11 +261,9 @@ export async function generateChatMessage(
 
     if (!message) return null;
 
-    // Чистим артефакты модели
     message = message.replace(/^["«»'"]|["«»'"]$/g, "").trim();
     message = message.split("\n")[0]?.trim() ?? message;
 
-    // Умная инъекция паттерна + опечатки
     message = maybeInjectPattern(message, learnedPatterns);
     message = maybeAddTypo(message);
 
@@ -242,8 +275,7 @@ export async function generateChatMessage(
 }
 
 /**
- * Умный shouldRespond — теперь учитывает game state и hype.
- * При высокой интенсивности момента → пропускает LLM вызов (экономит токены).
+ * Умный shouldRespond — учитывает game state и hype.
  */
 export async function shouldRespond(
   apiKey: string,
@@ -257,30 +289,20 @@ export async function shouldRespond(
   const gs = getGameState();
   const hs = getHypeState();
 
-  // --- Быстрый путь: правила без LLM ---
-
-  // Всегда молчим 15% времени (human variance)
   if (!forceTrigger && Math.random() < 0.15) return false;
 
-  // Высокоинтенсивный момент → всегда реагируем (экономим токены)
   if (gs.momentIntensity >= 8 || gs.momentType === "ace" || gs.momentType === "clutch") {
-    logger.debug({ momentType: gs.momentType, intensity: gs.momentIntensity }, "Hot trigger: high intensity moment");
     return true;
   }
 
-  // Чат взрывается → реагируем
   if (hs.isHot && hs.currentLevel >= 8) {
-    logger.debug({ hypeLevel: hs.currentLevel }, "Hot trigger: chat hype spike");
     return true;
   }
 
-  // Бомба заложена → высокий шанс реакции
   if (gs.isBombPlanted && Math.random() < 0.7) return true;
 
-  // Форс-триггер от оркестратора (хот-момент)
   if (forceTrigger) return true;
 
-  // --- Медленный путь: спрашиваем LLM ---
   try {
     const gameContext = gs.momentType !== "normal"
       ? `\nCS2 момент: ${gs.momentType} (интенсивность ${gs.momentIntensity}/10)`
