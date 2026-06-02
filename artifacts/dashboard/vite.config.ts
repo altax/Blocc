@@ -81,6 +81,8 @@ export default defineConfig({
     },
     headers: process.env.NODE_ENV !== "production" ? {
       "Cache-Control": "no-store",
+      "X-Frame-Options": "ALLOWALL",
+      "Content-Security-Policy": "frame-ancestors *",
     } : {},
   },
   preview: {
